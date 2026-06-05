@@ -1,0 +1,32 @@
+{
+  "name": "ai-shoppable-video-factory-frontend",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "latest",
+    "lucide-react": "latest",
+    "next": "15.5.19",
+    "react": "19.1.2",
+    "react-dom": "19.1.2",
+    "react-masonry-css": "latest",
+    "swr": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "autoprefixer": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "15.5.19",
+    "postcss": "latest",
+    "tailwindcss": "^3.4.17",
+    "typescript": "latest"
+  }
+}
