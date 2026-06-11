@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Braces,
   CirclePlay,
   Copy,
+  FileUp,
   Film,
   Layers3,
   Mic2,
@@ -123,6 +124,7 @@ export default function LongVideoPage() {
   const [audience, setAudience] = useState("TikTok 美国 25-40 岁通勤和健身人群");
   const [sellingPoints, setSellingPoints] = useState("一键清洗, 轻便可携带, 10秒出杯, 适合早餐和健身后");
   const [brandTone, setBrandTone] = useState("真实测评，不夸张，像朋友推荐");
+  const [referenceAsset, setReferenceAsset] = useState("");
   const [archetype, setArchetype] = useState<(typeof archetypes)[number]>("真实测评");
   const [shots, setShots] = useState<Shot[]>(defaultShots);
   const [models, setModels] = useState<ProviderModel[]>([]);
@@ -132,6 +134,16 @@ export default function LongVideoPage() {
   const [job, setJob] = useState<VideoJob | null>(null);
   const [error, setError] = useState("");
   const totalSeconds = shots.length * 8;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const promptParam = searchParams.get("prompt");
+    const referenceParam = searchParams.get("reference");
+    const subjectParam = searchParams.get("subject");
+    if (subjectParam) setProductName(subjectParam);
+    if (referenceParam) setReferenceAsset(referenceParam);
+    if (promptParam) setBrandTone((current) => `${current}；首页需求：${promptParam.slice(0, 240)}`);
+  }, []);
 
   const promptJson = useMemo(() => {
     const points = sellingPoints
@@ -143,11 +155,13 @@ export default function LongVideoPage() {
       {
         product: productName,
         audience,
+        reference_asset: referenceAsset || "none",
         long_video_logic: "multi-shot story, paired visual/audio memory, consistent character/product identity",
         prompts: shots.map((shot, index) =>
           [
             `Shot ${index + 1}: ${shot.title}.`,
             `Product: ${productName}. Selling points: ${points}. Target audience: ${audience}. Brand tone: ${brandTone}.`,
+            referenceAsset ? `Reference Asset: ${referenceAsset}. Preserve visible product traits from this reference.` : "",
             `Roles & Subjects: ${shot.role}.`,
             `Action & Dialogue: ${shot.action}. Mention the product naturally and keep the commerce message useful.`,
             `Style: ${shot.style}. Archetype: ${archetype}.`,
@@ -161,7 +175,7 @@ export default function LongVideoPage() {
       null,
       2,
     );
-  }, [archetype, audience, brandTone, productName, sellingPoints, shots]);
+  }, [archetype, audience, brandTone, productName, referenceAsset, sellingPoints, shots]);
 
   const loadModels = async () => {
     setIsLoadingModels(true);
@@ -252,6 +266,21 @@ export default function LongVideoPage() {
             <Field label="表达口吻">
               <input className="field-input" value={brandTone} onChange={(event) => setBrandTone(event.target.value)} />
             </Field>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-black/10 bg-[#f5f5f7] p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <FileUp size={16} className="text-[#0071e3]" />
+              参考素材
+            </div>
+            <div className="grid gap-3">
+              <input
+                className="field-input"
+                value={referenceAsset}
+                onChange={(event) => setReferenceAsset(event.target.value)}
+                placeholder="粘贴商品图、视频、素材 ID 或参考链接"
+              />
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
