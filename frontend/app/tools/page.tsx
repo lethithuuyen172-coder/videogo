@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
@@ -32,26 +33,31 @@ const toolMeta: Record<string, { group: string; desc: string; icon: typeof Wand2
     group: "视频处理",
     desc: "擦除硬字幕、旧促销文字和干扰型贴片。",
     icon: Captions,
+    href: "/tools/subtitle-erase",
   },
   "watermark-remove": {
     group: "视频处理",
     desc: "合规场景下清理自有素材水印和平台标记。",
     icon: Scissors,
+    href: "/tools/watermark-remove",
   },
   "viral-remix": {
     group: "爆款裂变",
     desc: "从一条脚本扩展出多套角度、钩子和分镜。",
     icon: Layers3,
+    href: "/tools/viral-remix",
   },
   "prompt-reverse": {
     group: "Prompt 工具",
     desc: "从图片或视频画面反推出可复用提示词结构。",
     icon: ImageUp,
+    href: "/tools/prompt-reverse",
   },
   "video-prompt": {
     group: "Prompt 工具",
     desc: "把商品卖点改写成视频模型可执行镜头提示词。",
     icon: FileVideo,
+    href: "/tools/video-prompt",
   },
 };
 
@@ -148,7 +154,11 @@ export default function ToolsPage() {
                       <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{meta.desc}</p>
                       <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold">
                         <span className="text-[#86868b]">{tool.credit_cost} 积分</span>
-                        {meta.href ? <span className="text-[#0071e3]">可打开专页</span> : null}
+                        {meta.href ? (
+                          <Link className="text-[#0071e3]" href={meta.href} onClick={(event) => event.stopPropagation()}>
+                            打开专页
+                          </Link>
+                        ) : null}
                       </div>
                     </div>
                   );

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Play, WandSparkles } from "lucide-react";
-import { Panel } from "@/components/Panel";
+import { Clock3, FileVideo, ImagePlus, Layers3, Play, WandSparkles } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { VideoPreview } from "./components/VideoPreview";
 import { VideoSettingsPanel } from "./components/VideoSettingsPanel";
@@ -35,16 +34,17 @@ export default function VideoPage() {
   const [sellingPoints, setSellingPoints] = useState("一键清洗, 杯身轻便, 早餐更省事");
   const [targetMarket, setTargetMarket] = useState("US");
   const [targetAudience, setTargetAudience] = useState("25-40岁短视频购物用户");
+  const [referenceAsset, setReferenceAsset] = useState("");
+  const [batchCount, setBatchCount] = useState(1);
   const [script, setScript] = useState<GeneratedScript | null>(null);
   const [scriptError, setScriptError] = useState("");
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const { job, error, isRunning, createJob } = useVideoGeneration();
   const platformTemplates = useMemo(() => templates.filter((item) => item.platform === platform), [platform, templates]);
+  const estimatedCredits = Math.max(10, duration * 8) * batchCount;
 
   useEffect(() => {
-    apiClient.get<ScriptTemplate[]>("/videos/scripts/templates").then((items) => {
-      setTemplates(items);
-    }).catch(() => undefined);
+    apiClient.get<ScriptTemplate[]>("/videos/scripts/templates").then(setTemplates).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -79,110 +79,216 @@ export default function VideoPage() {
     }
   };
 
+  const submit = () => {
+    createJob(
+      {
+        prompt,
+        model_id: modelId,
+        duration_seconds: duration,
+        reference_image_url: referenceAsset || undefined,
+      },
+      runMode,
+    );
+  };
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[300px_1fr_340px]">
-      <Panel title="视频参数">
-        <VideoSettingsPanel modelId={modelId} setModelId={setModelId} duration={duration} setDuration={setDuration} />
-        <div className="mt-4 grid gap-3 border-t border-line pt-4 text-sm">
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "TikTok", value: "tiktok" },
-              { label: "抖音", value: "douyin" },
-            ].map((item) => (
-              <button
-                key={item.value}
-                className={`rounded-md border border-line px-3 py-2 ${platform === item.value ? "bg-accent text-white" : "bg-white"}`}
-                onClick={() => setPlatform(item.value as "tiktok" | "douyin")}
-              >
-                {item.label}
-              </button>
-            ))}
+    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+      <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#0071e3]">AI Video</p>
+            <h1 className="mt-2 text-4xl font-semibold md:text-5xl">AI 视频</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#6e6e73]">
+              对齐 DA 的视频生成工作台：参考素材、文本提示、模型设置、生成数量、预计积分、预览和历史任务集中在一页。
+            </p>
           </div>
-          <label className="grid gap-1">
-            脚本 Skill
-            <select className="rounded-md border border-line px-3 py-2" value={templateKey} onChange={(event) => setTemplateKey(event.target.value)}>
-              {platformTemplates.map((item) => (
-                <option key={item.key} value={item.key}>
-                  {item.source_id}. {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1">
-            产品
-            <input className="rounded-md border border-line px-3 py-2" value={productName} onChange={(event) => setProductName(event.target.value)} />
-          </label>
-          <label className="grid gap-1">
-            卖点
-            <textarea className="h-20 resize-none rounded-md border border-line px-3 py-2" value={sellingPoints} onChange={(event) => setSellingPoints(event.target.value)} />
-          </label>
-          <label className="grid gap-1">
-            市场
-            <input className="rounded-md border border-line px-3 py-2" value={targetMarket} onChange={(event) => setTargetMarket(event.target.value)} />
-          </label>
-          <label className="grid gap-1">
-            人群
-            <input className="rounded-md border border-line px-3 py-2" value={targetAudience} onChange={(event) => setTargetAudience(event.target.value)} />
-          </label>
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 font-semibold text-white disabled:opacity-50"
-            disabled={isGeneratingScript || !productName || !templateKey}
-            onClick={generateScript}
-          >
-            <WandSparkles size={16} />
-            {isGeneratingScript ? "生成中" : "生成脚本"}
-          </button>
-          {scriptError ? <p className="text-sm text-red-600">{scriptError}</p> : null}
+          <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
+            <Metric label="数量" value={`${batchCount}`} />
+            <Metric label="时长" value={`${duration}s`} />
+            <Metric label="预计" value={`${estimatedCredits}`} />
+          </div>
         </div>
-      </Panel>
-      <Panel title="预览">
-        <VideoPreview url={job?.output_url} progress={job?.progress ?? 0} />
-        {script ? (
-          <div className="mt-4 overflow-hidden rounded-md border border-line">
-            <div className="border-b border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
-              {script.template.source_id}. {script.template.name}
-            </div>
-            <div className="grid gap-2 p-3 text-xs text-slate-600 md:grid-cols-2">
-              {script.script.map((shot) => (
-                <div key={shot.shot} className="rounded-md bg-white p-2">
-                  <div className="font-semibold text-slate-900">{shot.shot} · {shot.time} · {shot.goal}</div>
-                  <p className="mt-1 leading-5">{shot.visual}</p>
-                </div>
+      </section>
+
+      <section className="mt-5 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+        <aside className="grid gap-4">
+          <Panel title="新建视频">
+            <VideoSettingsPanel modelId={modelId} setModelId={setModelId} duration={duration} setDuration={setDuration} />
+            <label className="mt-3 grid gap-1 text-xs font-semibold text-[#6e6e73]">
+              新建数量
+              <select className="control" value={batchCount} onChange={(event) => setBatchCount(Number(event.target.value))}>
+                <option value={1}>1 条</option>
+                <option value={2}>2 条</option>
+                <option value={4}>4 条</option>
+              </select>
+            </label>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                { label: "TikTok", value: "tiktok" },
+                { label: "抖音", value: "douyin" },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  className={`h-10 rounded-full border text-sm font-semibold ${platform === item.value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-black/10 bg-white text-[#1d1d1f]"}`}
+                  onClick={() => setPlatform(item.value as "tiktok" | "douyin")}
+                >
+                  {item.label}
+                </button>
               ))}
             </div>
-          </div>
-        ) : null}
-      </Panel>
-      <Panel title="提示词">
-        <textarea className="h-52 w-full resize-none rounded-md border border-line p-3 text-sm" value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          {[
-            { label: "立即生成", value: "sync" },
-            { label: "异步队列", value: "queue" },
-          ].map((item) => (
-            <button
-              key={item.value}
-              className={`rounded-md border border-line px-3 py-2 ${
-                runMode === item.value ? "bg-accent text-white" : "bg-white"
-              }`}
-              onClick={() => setRunMode(item.value as "sync" | "queue")}
-            >
-              {item.label}
+          </Panel>
+
+          <Panel title="商品脚本">
+            <Field label="脚本 Skill">
+              <select className="control" value={templateKey} onChange={(event) => setTemplateKey(event.target.value)}>
+                {platformTemplates.map((item) => (
+                  <option key={item.key} value={item.key}>{item.source_id}. {item.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="产品">
+              <input className="control" value={productName} onChange={(event) => setProductName(event.target.value)} />
+            </Field>
+            <Field label="卖点">
+              <textarea className="control min-h-20 resize-none py-2" value={sellingPoints} onChange={(event) => setSellingPoints(event.target.value)} />
+            </Field>
+            <Field label="市场">
+              <input className="control" value={targetMarket} onChange={(event) => setTargetMarket(event.target.value)} />
+            </Field>
+            <Field label="人群">
+              <input className="control" value={targetAudience} onChange={(event) => setTargetAudience(event.target.value)} />
+            </Field>
+            <button className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#1d1d1f] text-sm font-semibold text-white" disabled={isGeneratingScript || !productName || !templateKey} onClick={generateScript}>
+              <WandSparkles size={16} />
+              {isGeneratingScript ? "生成中" : "生成脚本"}
             </button>
-          ))}
-        </div>
-        <button
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          disabled={isRunning || !modelId}
-          onClick={() => createJob({ prompt, model_id: modelId, duration_seconds: duration }, runMode)}
-        >
-          <Play size={16} />
-          {isRunning ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : null}
-          {isRunning ? "生成中" : "生成视频"}
-        </button>
-        {job ? <p className="mt-3 text-xs text-slate-500">任务 {job.id} · {job.status}</p> : null}
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      </Panel>
+            {scriptError ? <p className="mt-2 text-sm text-red-600">{scriptError}</p> : null}
+          </Panel>
+        </aside>
+
+        <main className="grid gap-4">
+          <Panel title="参考素材">
+            <div className="grid gap-3 md:grid-cols-[1fr_160px]">
+              <input
+                className="control"
+                value={referenceAsset}
+                onChange={(event) => setReferenceAsset(event.target.value)}
+                placeholder="粘贴商品图、视频、素材 ID 或参考图 URL"
+              />
+              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white text-sm font-semibold text-[#0071e3]">
+                <ImagePlus size={16} />
+                选择素材
+              </button>
+            </div>
+          </Panel>
+
+          <Panel title="提示词">
+            <textarea
+              className="min-h-64 w-full resize-none rounded-lg border border-black/10 bg-[#f5f5f7] p-3 text-sm leading-6 outline-none focus:border-[#0071e3] focus:bg-white"
+              maxLength={4000}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+            />
+            <div className="mt-2 flex justify-between text-xs text-[#86868b]">
+              <span>支持产品、镜头、声音、背景、转化动作描述</span>
+              <span>{prompt.length}/4000</span>
+            </div>
+          </Panel>
+
+          {script ? (
+            <Panel title={`${script.template.source_id}. ${script.template.name}`}>
+              <div className="grid gap-2 text-xs text-[#6e6e73] md:grid-cols-2">
+                {script.script.map((shot) => (
+                  <div key={shot.shot} className="rounded-lg bg-[#f5f5f7] p-3">
+                    <div className="font-semibold text-[#1d1d1f]">{shot.shot} · {shot.time} · {shot.goal}</div>
+                    <p className="mt-1 leading-5">{shot.visual}</p>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          ) : null}
+        </main>
+
+        <aside className="grid h-fit gap-4">
+          <Panel title="预览">
+            <VideoPreview url={job?.output_url} progress={job?.progress ?? 0} />
+          </Panel>
+          <Panel title="生成">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {[
+                { label: "立即生成", value: "sync" },
+                { label: "任务队列", value: "queue" },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  className={`h-10 rounded-full border font-semibold ${runMode === item.value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-black/10 bg-white"}`}
+                  onClick={() => setRunMode(item.value as "sync" | "queue")}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <button className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#0071e3] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,113,227,0.28)] disabled:opacity-50" disabled={isRunning || !modelId} onClick={submit}>
+              <Play size={16} />
+              {isRunning ? "生成中" : "立即生成"}
+            </button>
+            <div className="mt-4 grid gap-2 text-xs text-[#6e6e73]">
+              <StatusLine icon={Clock3} label="预计积分" value={`${estimatedCredits}`} />
+              <StatusLine icon={Layers3} label="模式" value={runMode === "sync" ? "立即生成" : "任务队列"} />
+              <StatusLine icon={FileVideo} label="任务" value={job ? `${job.id} · ${job.status}` : "等待生成"} />
+            </div>
+            {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+          </Panel>
+        </aside>
+      </section>
+      <style jsx>{`
+        .control {
+          height: 44px;
+          width: 100%;
+          border-radius: 10px;
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          background: #f5f5f7;
+          padding: 0 12px;
+          font-size: 14px;
+          outline: none;
+        }
+        .control:focus {
+          border-color: #0071e3;
+          background: white;
+          box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.14);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-black/10 bg-white/85 p-4 shadow-[0_10px_34px_rgba(0,0,0,0.05)]">
+      <h2 className="mb-3 text-sm font-semibold">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="mt-3 grid gap-1 text-xs font-semibold text-[#6e6e73]">{label}{children}</label>;
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-black/10 bg-white/70 px-3 py-2 shadow-sm">
+      <div className="text-[10px] text-[#86868b]">{label}</div>
+      <div className="text-lg font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function StatusLine({ icon: Icon, label, value }: { icon: typeof Clock3; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-[#f5f5f7] px-3 py-2">
+      <span className="inline-flex items-center gap-2"><Icon size={14} className="text-[#0071e3]" />{label}</span>
+      <span className="font-semibold text-[#1d1d1f]">{value}</span>
     </div>
   );
 }
