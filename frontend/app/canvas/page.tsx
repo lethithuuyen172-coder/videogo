@@ -92,6 +92,9 @@ export default function CanvasHomePage() {
   const [selectedKey, setSelectedKey] = useState(templates[0].key);
   const [customTitle, setCustomTitle] = useState("");
   const [background, setBackground] = useState(templates[0].background_color);
+  const [contextPrompt, setContextPrompt] = useState("");
+  const [contextReference, setContextReference] = useState("");
+  const [contextSubject, setContextSubject] = useState("");
   const [isCreating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,13 +106,23 @@ export default function CanvasHomePage() {
   }, [items]);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const promptParam = searchParams.get("prompt");
+    const referenceParam = searchParams.get("reference");
+    const subjectParam = searchParams.get("subject");
+    if (promptParam) setContextPrompt(promptParam);
+    if (referenceParam) setContextReference(referenceParam);
+    if (subjectParam) {
+      setContextSubject(subjectParam);
+      setCustomTitle(`${subjectParam} 画布`);
+    }
     apiClient.get<CanvasItem[]>("/canvases").then(setItems).catch((err) => setError(err instanceof Error ? err.message : "画布加载失败"));
   }, []);
 
   useEffect(() => {
     setBackground(selected.background_color);
-    setCustomTitle(selected.title);
-  }, [selected]);
+    setCustomTitle(contextSubject ? `${contextSubject} ${selected.title}` : selected.title);
+  }, [contextSubject, selected]);
 
   const createCanvas = async (template = selected) => {
     setError(null);
@@ -123,7 +136,12 @@ export default function CanvasHomePage() {
       };
       const created = await apiClient.post<CanvasItem>("/canvases", payload);
       setItems((next) => [created, ...next]);
-      router.push(`/canvas/${created.id}`);
+      const params = new URLSearchParams();
+      if (contextPrompt) params.set("prompt", contextPrompt);
+      if (contextReference) params.set("reference", contextReference);
+      if (contextSubject) params.set("subject", contextSubject);
+      const query = params.toString();
+      router.push(`/canvas/${created.id}${query ? `?${query}` : ""}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "画布创建失败");
     } finally {
@@ -228,6 +246,13 @@ export default function CanvasHomePage() {
         <aside className="grid h-fit gap-4">
           <section className="rounded-lg border border-black/10 bg-white/85 p-4 shadow-[0_10px_34px_rgba(0,0,0,0.05)]">
             <h2 className="text-sm font-semibold">创建设置</h2>
+            {contextPrompt || contextReference || contextSubject ? (
+              <div className="mt-3 rounded-lg bg-[#f2f8ff] p-3 text-xs leading-5 text-[#0066cc]">
+                {contextSubject ? <div>主体：{contextSubject}</div> : null}
+                {contextPrompt ? <div>需求：{contextPrompt}</div> : null}
+                {contextReference ? <div className="truncate">参考：{contextReference}</div> : null}
+              </div>
+            ) : null}
             <label className="mt-4 grid gap-2 text-xs font-semibold text-[#86868b]">
               标题
               <input
