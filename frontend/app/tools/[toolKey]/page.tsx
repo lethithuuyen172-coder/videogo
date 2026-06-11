@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
+  BadgeCheck,
   Captions,
   FileVideo,
   ImageUp,
@@ -13,6 +14,7 @@ import {
   Scissors,
   Wand2,
 } from "lucide-react";
+import { apiClient } from "@/lib/api";
 
 const toolConfig = {
   "subtitle-erase": {
@@ -71,6 +73,15 @@ type ToolKey = keyof typeof toolConfig;
 
 const fallbackKey: ToolKey = "video-prompt";
 
+type ToolTask = {
+  id: string;
+  status: string;
+  credit_cost: number;
+  rq_job_id?: string | null;
+};
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default function ToolDetailPage() {
   const params = useParams<{ toolKey: string }>();
   const key = (params.toolKey in toolConfig ? params.toolKey : fallbackKey) as ToolKey;
@@ -81,6 +92,8 @@ export default function ToolDetailPage() {
   const [preset, setPreset] = useState<string>(config.presets[0]);
   const [ratio, setRatio] = useState("9:16");
   const [status, setStatus] = useState<"idle" | "running" | "done">("idle");
+  const [task, setTask] = useState<ToolTask | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const preview = useMemo(() => {
     return [
@@ -92,9 +105,26 @@ export default function ToolDetailPage() {
     ].join("\n");
   }, [asset, config.title, preset, prompt, ratio]);
 
-  const runTask = () => {
+  const runTask = async () => {
     setStatus("running");
-    window.setTimeout(() => setStatus("done"), 900);
+    setTask(null);
+    setError(null);
+    try {
+      const payload = {
+        input_material_id: uuidPattern.test(asset.trim()) ? asset.trim() : undefined,
+        asset_url: asset,
+        preset,
+        ratio,
+        prompt,
+        tool_key: key,
+      };
+      const created = await apiClient.post<ToolTask>(`/tools/${key}/tasks`, payload);
+      setTask(created);
+      setStatus("done");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "工具任务创建失败");
+      setStatus("idle");
+    }
   };
 
   return (
@@ -170,18 +200,32 @@ export default function ToolDetailPage() {
 
           <button
             className="mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,113,227,0.3)]"
+            disabled={status === "running"}
             onClick={runTask}
           >
             {status === "running" ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
             {status === "running" ? "处理中" : config.primaryLabel}
           </button>
+          {error ? <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
         </div>
 
         <aside className="h-fit rounded-lg border border-black/10 bg-[#1d1d1f] p-5 text-white shadow-[0_18px_60px_rgba(0,0,0,0.16)]">
           <div className="text-sm font-semibold">任务预览</div>
           <pre className="mt-4 whitespace-pre-wrap rounded-lg bg-white/10 p-4 text-xs leading-6 text-white/75">{preview}</pre>
+          {task ? (
+            <div className="mt-4 rounded-lg bg-[#12381f] p-4 text-xs leading-6 text-white/80">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+                <BadgeCheck size={16} className="text-[#30d158]" />
+                任务已创建
+              </div>
+              <div>ID：{task.id}</div>
+              <div>状态：{task.status}</div>
+              <div>积分：{task.credit_cost}</div>
+              {task.rq_job_id ? <div>队列：{task.rq_job_id}</div> : null}
+            </div>
+          ) : null}
           <div className="mt-4 rounded-lg bg-white/10 p-4 text-xs leading-6 text-white/70">
-            {status === "done" ? "已生成本地预览。后续接入真实处理 API 后，这里会展示输出文件、进度和消耗积分。" : "当前为产品化任务面板，保留 DA 类工具流程和参数结构。"}
+            {status === "done" ? "已创建真实工具任务。后续轮询 /tools/tasks/{task_id} 可展示输出文件、进度和消耗积分。" : "当前保留 DA 类工具流程和参数结构；可用工具会直接进入后端任务队列，未开放工具展示后端提示。"}
           </div>
         </aside>
       </section>

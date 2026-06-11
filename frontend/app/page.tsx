@@ -28,9 +28,9 @@ const modes = [
 
 const skillChips = [
   { label: "画质增强", href: "/tools/enhance" },
-  { label: "去水印", href: "/tools/watermark-remover" },
-  { label: "去字幕", href: "/tools/subtitle-remover" },
-  { label: "爆款裂变", href: "/tools/viral-variant" },
+  { label: "去水印", href: "/tools/watermark-remove" },
+  { label: "去字幕", href: "/tools/subtitle-erase" },
+  { label: "爆款裂变", href: "/tools/viral-remix" },
   { label: "反推提示词", href: "/tools/prompt-reverse" },
   { label: "视频提示词", href: "/tools/video-prompt" },
 ];
