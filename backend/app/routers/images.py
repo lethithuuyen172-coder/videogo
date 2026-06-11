@@ -21,6 +21,10 @@ def get_generation_service() -> GenerationService:
 async def models(request: Request) -> dict:
     """列出可用图片模型。"""
     items = [m.model_dump() for m in provider_router.list_models() if m.modality == "image"]
+    if request.headers.get("x-openai-api-key"):
+        for item in items:
+            if item["model_id"] == "dalle-3":
+                item["status"] = "configured"
     return ok(items, request)
 
 
@@ -80,7 +84,8 @@ async def run_image_now(
     service: GenerationService = Depends(get_generation_service),
 ) -> dict:
     """同步运行 mock 图片任务，便于本地验收。"""
-    job = await service.run_image_job(current_user["id"], job_id)
+    openai_api_key = request.headers.get("x-openai-api-key")
+    job = await service.run_image_job(current_user["id"], job_id, openai_api_key)
     return ok(JobResp(**job).model_dump(mode="json"), request)
 
 

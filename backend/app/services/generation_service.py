@@ -13,6 +13,7 @@ from app.models.generation import (
     ScriptGenerateReq,
     VideoCreateReq,
 )
+from app.services.script_skill_library import build_shoppable_video_script, list_script_templates
 
 
 class GenerationService:
@@ -100,6 +101,7 @@ class GenerationService:
     async def create_image_job(self, user_id: UUID, req: ImageCreateReq) -> dict:
         cost = provider_router.estimate_image_cost(req.model_id, req.resolution)
         provider_key = provider_router.image_providers[req.model_id].provider_key
+        prompt = self._apply_image_style(req.prompt, req.style_key)
         pool = await get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -111,7 +113,7 @@ class GenerationService:
                 """,
                 user_id,
                 req.material_id,
-                req.prompt,
+                prompt,
                 req.model_id,
                 provider_key,
                 req.aspect_ratio,
@@ -121,7 +123,7 @@ class GenerationService:
             )
         return dict(row)
 
-    async def run_image_job(self, user_id: UUID, job_id: UUID) -> dict:
+    async def run_image_job(self, user_id: UUID, job_id: UUID, openai_api_key: str | None = None) -> dict:
         pool = await get_pool()
         async with pool.acquire() as conn:
             job = await conn.fetchrow(
@@ -137,6 +139,7 @@ class GenerationService:
             aspect_ratio=job["aspect_ratio"],
             resolution=job["resolution"],
             image_format=job["image_format"],
+            openai_api_key=openai_api_key,
         )
         result = await provider_router.generate_image(job["model_id"], params)
         async with pool.acquire() as conn:
@@ -188,20 +191,12 @@ class GenerationService:
         }
 
     def generate_script(self, req: ScriptGenerateReq) -> dict:
-        """生成 FABE-S 脚本骨架，真实 LLM 可替换该方法。"""
-        points = "、".join(req.selling_points) or "核心卖点突出"
-        return {
-            "framework": "FABE-S",
-            "duration_seconds": req.duration_seconds,
-            "language": req.language,
-            "script": [
-                {"part": "Feature", "text": f"这款{req.product_name}主打{points}。"},
-                {"part": "Advantage", "text": "它把复杂步骤压缩成一次简单操作。"},
-                {"part": "Benefit", "text": "用户能更快看到效果，减少决策成本。"},
-                {"part": "Evidence", "text": "用真实场景展示前后对比和关键细节。"},
-                {"part": "Story", "text": "用日常痛点开场，以拥有后的轻松状态收尾。"},
-            ],
-        }
+        """按内置 108 个带货视频 Skill 目录生成脚本、分镜和视频 Prompt。"""
+        return build_shoppable_video_script(req)
+
+    def list_script_templates(self) -> list[dict]:
+        """列出可用于视频脚本生成的 TikTok/抖音模板。"""
+        return list_script_templates()
 
     async def _get_job(self, table: str, user_id: UUID, job_id: UUID, message: str) -> dict:
         pool = await get_pool()
@@ -210,3 +205,14 @@ class GenerationService:
         if row is None:
             raise AppError("E004", message, 404)
         return dict(row)
+
+    @staticmethod
+    def _apply_image_style(prompt: str, style_key: str | None) -> str:
+        """将图片风格预设转成稳定的提示词后缀。"""
+        suffixes = {
+            "commerce": "clean product lighting",
+            "lifestyle": "natural lifestyle scene",
+            "poster": "bold commercial poster",
+        }
+        suffix = suffixes.get(style_key or "")
+        return f"{prompt}, {suffix}" if suffix else prompt

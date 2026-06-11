@@ -27,6 +27,12 @@ def test_password_hash_roundtrip() -> None:
     assert not verify_password("wrong-password", password_hash)
 
 
+def test_seed_demo_password_hash_matches_demo_password() -> None:
+    """种子账号必须能用验收文档里的 Demo1234 登录。"""
+    seed_hash = "$2b$12$JfWnwyQJ3nrFhI4kfXzMnuyvySHd3scx6FHjbY/T5Eybp70q2YgEW"
+    assert verify_password("Demo1234", seed_hash)
+
+
 def test_api_key_hash_roundtrip() -> None:
     """API Key 明文只用于一次性展示，存储哈希仍可校验。"""
     plain_key, prefix = generate_api_key()

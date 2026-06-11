@@ -1,10 +1,12 @@
 """画布模块契约测试。"""
 
 import pytest
+from PIL import Image, ImageDraw
 from pydantic import ValidationError
 
 from app.main import app
 from app.models.canvas import CanvasCreateReq, CanvasElementReq
+from app.services.canvas_service import CanvasService
 
 
 def test_canvas_routes_include_update_delete_and_export() -> None:
@@ -25,7 +27,27 @@ def test_canvas_size_is_limited_to_4k() -> None:
 
 
 def test_canvas_element_type_is_enumerated() -> None:
-    """画布元素类型只允许图片、文字、形状和贴纸。"""
+    """画布元素类型只允许数据库 schema 支持的基础类型。"""
     assert CanvasElementReq(element_type="text").element_type == "text"
     with pytest.raises(ValidationError):
         CanvasElementReq(element_type="unknown")
+
+
+def test_canvas_export_draws_shape_pixels() -> None:
+    """导出绘制逻辑应生成真实图像像素，不再返回 mock URL 即结束。"""
+    image = Image.new("RGB", (64, 64), "#ffffff")
+    draw = ImageDraw.Draw(image)
+    CanvasService._draw_element(
+        draw,
+        {
+            "element_type": "rect",
+            "x": 8,
+            "y": 8,
+            "width": 24,
+            "height": 24,
+            "z_index": 1,
+            "visible": True,
+            "props": {"fill": "#0f766e"},
+        },
+    )
+    assert image.getpixel((12, 12)) == (15, 118, 110)

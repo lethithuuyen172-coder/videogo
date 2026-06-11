@@ -1,10 +1,18 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 type Message = { role: "user" | "assistant"; content: string };
 
 export function ChatMessageList({ messages }: { messages: Message[] }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   return (
-    <div className="grid gap-3">
+    <div className="grid max-h-[560px] gap-3 overflow-y-auto pr-1">
       {messages.map((message, index) => (
         <div
           key={`${message.role}-${index}`}
@@ -15,6 +23,7 @@ export function ChatMessageList({ messages }: { messages: Message[] }) {
           {message.content}
         </div>
       ))}
+      <div ref={bottomRef} />
     </div>
   );
 }

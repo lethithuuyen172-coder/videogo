@@ -26,6 +26,7 @@ export function useImageGeneration() {
       if (mode === "queue") {
         await apiClient.post(`/images/${created.id}/enqueue`);
         setJob(created);
+        setJob(await pollImageJob(created.id));
       } else {
         const completed = await apiClient.post<ImageJob>(`/images/${created.id}/run-now`);
         setJob(completed);
@@ -38,4 +39,15 @@ export function useImageGeneration() {
   };
 
   return { job, error, isRunning, createJob };
+}
+
+async function pollImageJob(jobId: string): Promise<ImageJob> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    const next = await apiClient.get<ImageJob>(`/images/${jobId}`);
+    if (["succeeded", "failed", "cancelled"].includes(next.status)) {
+      return next;
+    }
+  }
+  return apiClient.get<ImageJob>(`/images/${jobId}`);
 }

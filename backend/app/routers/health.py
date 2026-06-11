@@ -11,6 +11,7 @@ from app.core.redis_client import get_redis
 from app.core.responses import ok
 
 router = APIRouter(tags=["health"])
+RQ_QUEUE_NAMES = ("video:normal", "image:normal", "tool:normal")
 
 
 @router.get("/health")
@@ -33,7 +34,7 @@ async def health(request: Request) -> JSONResponse:
         redis = get_redis()
         redis.ping()
         checks["redis"] = "ok"
-        checks["queue_depth"] = redis.llen("rq:queue:default")
+        checks["queue_depth"] = sum(redis.llen(f"rq:queue:{queue_name}") for queue_name in RQ_QUEUE_NAMES)
     except Exception as exc:  # pragma: no cover - depends on local infra
         checks["redis"] = f"error: {exc.__class__.__name__}"
         http_status = status.HTTP_503_SERVICE_UNAVAILABLE

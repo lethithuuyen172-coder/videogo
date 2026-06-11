@@ -36,7 +36,7 @@ export default function ToolsPage() {
             </div>
           </Link>
         ))}
-        {tools.length === 0 ? <div className="text-sm text-slate-500">工具列表加载中</div> : null}
+        {tools.length === 0 ? <div className="text-sm text-slate-500">暂无可用工具</div> : null}
       </div>
     </Panel>
   );

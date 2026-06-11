@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Masonry from "react-masonry-css";
 import { Panel } from "@/components/Panel";
 import { apiClient } from "@/lib/api";
@@ -10,6 +11,7 @@ type Work = {
   id: string;
   title: string;
   work_type: string;
+  cover_url?: string | null;
   like_count: number;
 };
 
@@ -42,15 +44,18 @@ export default function DiscoverPage() {
           </button>
         ))}
       </div>
-      <Masonry breakpointCols={{ default: 4, 900: 3, 640: 2 }} className="masonry-grid" columnClassName="masonry-column">
-        {works.length === 0
-          ? Array.from({ length: 8 }).map((_, index) => (
-              <WorkCard key={index} title={`演示作品 ${index + 1}`} height={180 + (index % 4) * 42} />
-            ))
-          : works.map((work, index) => (
-              <WorkCard key={work.id} title={work.title} height={180 + (index % 4) * 42} />
-            ))}
-      </Masonry>
+      {works.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line p-8 text-center text-sm text-slate-500">
+          暂无作品，去创作第一个吧
+          <Link className="ml-3 rounded-md bg-accent px-3 py-2 text-white" href="/image">去创作</Link>
+        </div>
+      ) : (
+        <Masonry breakpointCols={{ default: 4, 900: 3, 640: 2 }} className="masonry-grid" columnClassName="masonry-column">
+          {works.map((work) => (
+            <WorkCard key={work.id} id={work.id} title={work.title} workType={work.work_type} coverUrl={work.cover_url} likeCount={work.like_count} />
+          ))}
+        </Masonry>
+      )}
     </Panel>
   );
 }

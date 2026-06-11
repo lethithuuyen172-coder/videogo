@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.core.database import get_pool
 from app.core.exceptions import AppError
+from app.core.task_queue import task_queue
 
 TOOLS = [
     {"tool_key": "enhance", "name": "画质增强", "status": "available", "credit_cost": 30},
@@ -45,7 +46,14 @@ class ToolService:
                 payload,
                 tool["credit_cost"],
             )
-        return dict(row)
+        data = dict(row)
+        rq_job_id = task_queue.enqueue(
+            "tool:normal",
+            "app.worker.tool_worker.process_tool_task",
+            str(data["id"]),
+        )
+        data["rq_job_id"] = rq_job_id
+        return data
 
     async def get_task(self, user_id: UUID, task_id: UUID) -> dict:
         pool = await get_pool()

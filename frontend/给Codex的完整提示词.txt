@@ -1,0 +1,261 @@
+## 你的任务
+
+一次性将项目 `D:\codex抖音tk带货开发\codex`（AI带货视频工厂 V2.0）从骨架 mock 状态补全为：本地 `docker compose up` 一键启动、注册登录后填 OpenAI API Key 就能在浏览器里真正生成图片和对话的完整网站。
+
+## 技术栈
+
+- 后端：FastAPI + Python 3.11 + asyncpg + Redis + RQ（已有框架和数据库 schema，不要改已有表结构）
+- 前端：Next.js 15 + React 19 + Tailwind CSS 3（已有页面壳，需补真实交互）
+- 数据库：PostgreSQL 16（18 张表，5 个 schema：public/video/image/canvas/community/chat）
+- 已有完整 Dockerfile：backend 的三个（api/worker/scheduler）都在 backend/ 下
+
+---
+
+## A. docker-compose.yml
+
+在项目根目录新建，6 个服务：
+
+postgres: postgres:16-alpine, 5432, 环境 POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres POSTGRES_DB=ugc_factory。将 ./backend/migrations/ 挂载到 /docker-entrypoint-initdb.d/ 实现启动自动建表。named volume pgdata。healthcheck: pg_isready -U postgres。
+
+redis: redis:7-alpine, 6379。named volume redisdata。healthcheck: redis-cli ping。
+
+api: 构建 ./backend/Dockerfile，8000 端口。env_file: ./backend/.env。depends_on postgres 和 redis（condition: service_healthy）。
+
+worker: 构建 ./backend/Dockerfile.worker。env_file: ./backend/.env。depends_on postgres 和 redis（condition: service_healthy）。
+
+frontend: 构建 ./frontend/Dockerfile（需新建），3000 端口。depends_on api。环境变量 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1。
+
+---
+
+## B. frontend/Dockerfile
+
+多阶段构建，基于 node:20-alpine：
+
+第一阶段 deps：COPY package.json package-lock.json ./ → npm ci
+第二阶段 builder：COPY --from=deps node_modules + 源码 → npm run build
+第三阶段 runner：COPY --from=builder public standalone .next/static → EXPOSE 3000 → CMD ["node", "server.js"]
+
+---
+
+## C. backend/.env
+
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ugc_factory
+REDIS_URL=redis://redis:6379/0
+JWT_SECRET_KEY=replace-with-32-char-random-string-here
+OPENAI_API_KEY=sk-your-key-here
+ENVIRONMENT=local
+
+---
+
+## D. frontend/.env.local
+
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+
+---
+
+## E. 真实图片生成——接 OpenAI DALL-E
+
+新建 backend/app/providers/openai_image_provider.py，继承 BaseImageProvider：
+
+- provider_key = "openai"
+- get_model_list() 返回 dalle-3，status 根据 openai_api_key 是否配置来定
+- generate_image() 调 openai.images.generate，参数 prompt/size/n=1/response_format=b64_json，结果解码 base64 写入 output_dir，返回 ProviderResult（url 用 public_base_url/storage/xxx）
+- estimate_cost() 返回 80（2048分辨率）或 50（1024）
+
+在 backend/app/providers/__init__.py 中导出 OpenAIImageProvider。
+
+在 backend/app/core/provider_router.py 的 _register_defaults() 中，用 OpenAIImageProvider() 替换旧的 dalle provider。
+
+在 backend/pyproject.toml 的 dependencies 加 "openai>=1.0"。
+
+---
+
+## F. AI 对话接真实 LLM
+
+修改 backend/app/services/conversation_service.py，新增 stream_chat(conversation_id, user_content) 方法：
+
+1. 查 chat.conversation_messages 拿最近 20 条历史
+2. 拼 messages = [{"role": row["role"], "content": row["content"]} ...] + {"role":"user","content": user_content}
+3. 调 openai.chat.completions.create(model="gpt-4o-mini", messages=messages, stream=True)
+4. 收集完整回复文本，写入 chat.conversation_messages
+5. async generator yield SSE: data: {"token":"xxx"}\n\n
+
+backend/app/routers/conversations.py 新增 POST /{conversation_id}/stream 路由，返回 StreamingResponse(content_type="text/event-stream")。
+
+前端 frontend/app/chat/page.tsx 改 send 函数：
+- 没有对话时先 POST /conversations 创建
+- POST /conversations/{id}/stream 带 {content: userInput}
+- 用 fetch + reader.read() 解析 SSE
+- 逐 token 追加到消息列表（打字效果）
+- 发送中 input 禁用、按钮 loading
+- ChatMessageList 加 useEffect + useRef，新消息时 scrollTo bottom
+
+ChatMessageList.tsx：加 `const bottomRef = useRef<HTMLDivElement>(null)` 和 `useEffect(() => bottomRef.current?.scrollIntoView({behavior:"smooth"}), [messages])`，在消息列表末尾放 `<div ref={bottomRef} />`。
+
+---
+
+## G. 前端页面全部接真实 API（禁止硬编码假数据）
+
+### 视频生成 video/page.tsx
+- 模型列表从 GET /videos/models 动态加载
+- 创建时 POST /videos → POST /videos/{id}/run-now
+- loading 时按钮 disabled + spinner
+- 错误红色提示，成功展示视频/preview
+- 用已有的 useVideoGeneration hook 没问题，但确保 API 路径匹配
+
+### 图片生成 image/page.tsx
+- 同上模式，GET /images/models 加载模型，GET /images/styles 加载风格预设
+- 生成后预览区显示真实图片 URL
+- 用已有的 useImageGeneration hook
+
+### 资产 assets/page.tsx
+- 从 GET /materials?material_type=xxx 加载
+- 每种类型 tab 切换重新请求
+- 点击素材弹 modal 全屏预览（如果是图片显示 img，视频显示 video）
+- 每个素材卡有删除按钮 DELETE /materials/{id}（确认弹窗）
+
+### 发现 discover/page.tsx
+- 从 GET /community/works 加载
+- 去掉 `Array.from({length:8})` 假数据
+- 空数据时显示"暂无作品，去创作第一个吧"+ 跳转按钮
+- WorkCard 显示真实 cover_url、title、work_type、like_count
+- 点击跳 /discover/{id}
+
+### 作品详情 discover/[workId]/page.tsx
+- 从 API 加载作品详情（如果后端没有单个作品接口，展示本地 state 或静态信息）
+- 显示大图/视频占位、标题、描述
+- 点赞 POST /community/works/{workId}/like、收藏 POST /community/works/{workId}/bookmark
+- 按钮点击后状态切换（已赞/未赞样式不同）
+
+### 积分 credits/page.tsx
+- GET /credits/balance + GET /credits/records 加载
+- 余额 0 时顶部黄色提示"积分不足，去充值"
+- 流水记录类型映射中文：deduct=消费 recharge=充值 refund=退款 freeze=冻结 adjust=调整
+- 金额正负颜色区分（正=绿 负=红）
+
+### 充值 credits/recharge/page.tsx
+- 保留套餐按钮，点击 loading
+- 订单创建后显示订单号和支付链接（Mock URL 标"开发模式"）
+
+### 管理后台 admin/page.tsx
+- 并行 GET /admin/dashboard /admin/users /admin/moderation/works /admin/provider-accounts
+- 用户列表每行"封禁"按钮 PUT /admin/users/{id} body {status:"suspended"}
+- 审核队列每行"通过/拒绝"按钮 POST /admin/moderation/works/{id}
+- 无权限时显示"需要管理员权限"
+
+### 画布编辑器 canvas/[canvasId]/page.tsx 及子组件
+
+CanvasWorkspace.tsx：用 div + CSS transform 实现元素 render 和拖拽。mousedown 选中、mousemove 移动、mouseup 释放。选中元素显示蓝色虚线边框。元素用绝对定位，style left/top/width/height/transform:rotate()。
+
+LayerPanel.tsx：GET /canvases/{canvasId} 加载元素，按 z_index 排序显示。每行：元素类型图标 + 名称。点击选中对应元素。上下箭头按钮调 PUT 改 z_index。眼睛图标切换 visible。锁图标切换 locked。
+
+ComponentPanel.tsx：四个按钮"添加文字/矩形/圆形/图片"，点击 POST /canvases/{canvasId}/elements 创建。文字默认 content="双击编辑"，矩形默认 200x150 蓝色，圆形默认 150x150 红色。
+
+CanvasToolbar.tsx：撤销/重做（state 栈）、缩放滑块（50%-200%）、导出按钮 POST /canvases/{canvasId}/export。
+
+### 画布列表 canvas/page.tsx
+- GET /canvases 加载我的画布列表
+- 去掉硬编码"TikTok 产品模板"链接
+- 每项显示标题+时间，点击进编辑器
+- 空列表显示"还没有画布，新建一个吧"
+
+### 工具 tools/page.tsx
+- GET /tools 加载，动态渲染卡片
+- 空列表显示"暂无可用工具"
+
+### 对话页左侧历史
+- GET /conversations 加载列表
+- 点击切换对话，重新加载消息
+- "新对话"按钮 POST /conversations
+
+---
+
+## H. 认证页面完善
+
+### 登录 auth/login/page.tsx
+- 底部加 `<Link href="/auth/register">没有账号？去注册</Link>`
+- 密码框加眼睛图标（lucide-react 的 Eye/EyeOff），点击切换 type
+- 错误时输入框上方红色提示
+- 登录成功跳 /chat
+
+### 注册 auth/register/page.tsx
+- 底部加 `<Link href="/auth/login">已有账号？去登录</Link>`
+- 密码框同样明文切换
+- 邮箱格式前端校验（正则）
+- 密码前提示"至少8位含大小写字母和数字"
+- 注册成功绿色提示 + "去登录"按钮
+
+### 忘记密码 auth/forgot-password/page.tsx（如不存在则新建）
+- 邮箱输入 → POST /auth/forgot-password → 显示"重置链接已发送（开发环境 token 如下：xxx）"
+- 底部返回登录
+
+### 重置密码 auth/reset-password/page.tsx（如不存在则新建）
+- 新密码 + 确认密码 → POST /auth/reset-password → 成功跳登录
+
+---
+
+## I. 全局组件
+
+### not-found.tsx 新建
+居中 404 大字 + "页面不存在" + 返回首页按钮
+
+### error.tsx 新建
+"use client"，显示 error.message + 重试按钮
+
+### AppShell.tsx 改造
+- sidebar 底部加：已登录显示邮箱（truncate）+ 退出按钮；未登录显示登录链接
+- 移动端底部导航（md:hidden）：4 个 tab（对话/创作/发现/我的），用 lucide-react 的 MessageCircle/Video/Compass/User 图标
+- main 区域加 pb-16 给底部导航让位
+
+---
+
+## J. 种子数据
+
+修改 backend/migrations/002_seed_data.sql，用 DO $$ BEGIN ... END $$ 包裹，先判断数据是否存在：
+
+- admin@demo.com / Demo1234 / role=admin / credit_balance=10000 / status=active
+- user1@demo.com / user2@demo.com / Demo1234 / role=user / credit_balance=500 / status=active
+- 所有用户的 email_verified_at = now()
+- 密码 bcrypt hash：$2b$12$LJ3m4ys3Lk0TSwHCpNqrAu3rPqQxPqE5Qx5Qx5Qx5Qx5Qx5Qx5Qx5
+- 10 条素材（不同类型混合），owner user1
+- 3 个画布，owner user1
+- 5 条社区作品（3 published + 2 pending_review），不同类型
+- 20 条积分流水，owner user1
+- 1 条 provider_accounts：provider_key=openai, modality=image, status=active
+- 所有 UUID 用 gen_random_uuid()
+
+---
+
+## K. 依赖补充
+
+backend/pyproject.toml 的 dependencies 加 "openai>=1.0"（已有 httpx）。
+
+---
+
+## 验收标准
+
+1. docker compose up --build 后全部 healthy
+2. http://localhost:3000 可访问
+3. 注册→登录→对话→发消息收到 GPT 回复
+4. 图片生成输入 prompt 点生成看到 DALL-E 图片
+5. 画布新建→添加元素→拖动→导出
+6. 资产页看到素材列表
+7. 发现页看到作品
+8. 积分页看到余额和流水
+9. admin@demo.com 登录管理后台看到统计
+10. 移动端（375px 宽）底部导航可用、布局不错乱
+11. 无浏览器控制台 error
+12. cd frontend && npm run build 成功
+13. cd backend && ruff check app/ 通过
+
+---
+
+## 约束
+
+- 不修改已有数据库表结构（新增表/字段可以）
+- 前端 API 调用必须用 `import { apiClient } from "@/lib/api"`，禁止裸 fetch
+- 用 lucide-react 图标（已在依赖）
+- Tailwind 颜色用 token：ink(#111827) panel(#f8fafc) line(#d7dde8) accent(#0f766e) signal(#b45309)
+- Python 加包改 pyproject.toml
+- 所有新代码加 type hint
+- 修改文件前先 Read 确认当前内容，用 Edit 精准修改

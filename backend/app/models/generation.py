@@ -13,7 +13,7 @@ class VideoCreateReq(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
     model_id: str = "mock-video"
     material_id: UUID | None = None
-    duration_seconds: int = Field(default=15, ge=5, le=40)
+    duration_seconds: int = Field(default=8, ge=4, le=300)
     aspect_ratio: Literal["9:16", "16:9", "1:1"] = "9:16"
     resolution: Literal["720p", "1080p"] = "720p"
 
@@ -27,6 +27,7 @@ class ImageCreateReq(BaseModel):
     aspect_ratio: Literal["1:1", "9:16", "16:9", "4:5"] = "1:1"
     resolution: Literal["512", "1024", "2048", "4096"] = "1024"
     image_format: Literal["png", "jpeg", "webp"] = "png"
+    style_key: str | None = None
 
 
 class JobResp(BaseModel):
@@ -52,9 +53,16 @@ class ProductAnalysisReq(BaseModel):
 
 
 class ScriptGenerateReq(BaseModel):
-    """FABE-S 脚本生成请求。"""
+    """带货视频脚本生成请求。"""
 
     product_name: str = Field(min_length=1, max_length=120)
     selling_points: list[str] = Field(default_factory=list, max_length=8)
     duration_seconds: Literal[15, 30, 40] = 15
     language: Literal["zh", "en", "ja", "ko", "th", "vi"] = "zh"
+    platform: Literal["tiktok", "douyin"] = "tiktok"
+    template_key: str | None = Field(default=None, max_length=32)
+    target_market: str | None = Field(default=None, max_length=80)
+    target_audience: str | None = Field(default=None, max_length=160)
+    product_scenario: str | None = Field(default=None, max_length=160)
+    style_preference: str | None = Field(default=None, max_length=80)
+    call_to_action: str | None = Field(default=None, max_length=120)

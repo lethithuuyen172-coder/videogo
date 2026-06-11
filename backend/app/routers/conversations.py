@@ -1,11 +1,12 @@
-"""AI 对话 API，使用 SSE 提供本地 mock 流式回复。"""
+"""AI 对话 API，使用 SSE 提供流式回复。"""
 
-import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from app.config import get_settings
+from app.core.exceptions import AppError
 from app.core.responses import ok
 from app.models.chat import ConversationCreateReq, ConversationResp, MessageCreateReq, MessageResp
 from app.routers.auth import get_current_user
@@ -73,15 +74,18 @@ async def send_message(
 async def stream_message(
     conversation_id: UUID,
     req: MessageCreateReq,
+    request: Request,
     current_user: dict = Depends(get_current_user),
+    service: ConversationService = Depends(get_conversation_service),
 ) -> StreamingResponse:
-    """SSE 流式回复，首包立即返回，满足基础 Agent 体验。"""
+    """SSE 流式回复。"""
+    settings = get_settings()
+    openai_api_key = request.headers.get("x-openai-api-key")
+    effective_key = openai_api_key or settings.openai_api_key
+    if not effective_key or effective_key == "sk-your-key-here":
+        raise AppError("E101", "请先配置 OPENAI_API_KEY", 400)
 
-    async def event_stream():
-        text = f"我会基于当前 Agent 技能处理你的请求：{req.content}"
-        for token in text.split():
-            yield f"data: {token}\n\n"
-            await asyncio.sleep(0.02)
-        yield "data: [DONE]\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        service.stream_chat(current_user["id"], conversation_id, req.content, openai_api_key),
+        media_type="text/event-stream",
+    )

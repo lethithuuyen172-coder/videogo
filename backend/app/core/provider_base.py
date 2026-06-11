@@ -22,7 +22,7 @@ class VideoGenParams(BaseModel):
     """视频生成参数，兼容文生视频和图生视频。"""
 
     prompt: str = Field(min_length=1, max_length=4000)
-    duration_seconds: int = Field(default=15, ge=5, le=40)
+    duration_seconds: int = Field(default=8, ge=4, le=300)
     aspect_ratio: Literal["9:16", "16:9", "1:1"] = "9:16"
     resolution: Literal["720p", "1080p"] = "720p"
     reference_image_url: str | None = None
@@ -38,6 +38,7 @@ class ImageGenParams(BaseModel):
     image_format: Literal["png", "jpeg", "webp"] = "png"
     reference_image_url: str | None = None
     output_dir: Path = Path("./storage/generated")
+    openai_api_key: str | None = None
 
 
 class ProviderResult(BaseModel):

@@ -1,7 +1,11 @@
 """画布业务逻辑，封装画布与元素的数据访问和所有权校验。"""
 
+from pathlib import Path
 from uuid import UUID
 
+from PIL import Image, ImageDraw, ImageFont
+
+from app.config import get_settings
 from app.core.database import get_pool
 from app.core.exceptions import AppError
 from app.models.canvas import CanvasCreateReq, CanvasElementReq, CanvasUpdateReq
@@ -95,9 +99,54 @@ class CanvasService:
             raise AppError("E004", "画布不存在", 404)
 
     async def export_canvas(self, user_id: UUID, canvas_id: UUID) -> dict:
-        """导出画布图片，V1.0 返回可替换为真实文件的 mock URL。"""
-        await self.get_canvas_with_elements(user_id, canvas_id)
-        return {"format": "png", "url": f"mock://canvas-export/{canvas_id}.png"}
+        """导出画布为本地 PNG 文件。"""
+        data = await self.get_canvas_with_elements(user_id, canvas_id)
+        canvas = data["canvas"]
+        elements = data["elements"]
+        width = int(canvas["width"])
+        height = int(canvas["height"])
+        image = Image.new("RGB", (width, height), str(canvas["background_color"]))
+        draw = ImageDraw.Draw(image)
+        for element in sorted(elements, key=lambda item: item["z_index"]):
+            if not element["visible"]:
+                continue
+            self._draw_element(draw, element)
+
+        settings = get_settings()
+        output_dir = settings.local_storage_path.rstrip("/\\") + "/generated"
+        path = Path(output_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        filename = f"canvas-{canvas_id}.png"
+        image.save(path / filename)
+        return {
+            "format": "png",
+            "url": f"{settings.public_base_url}/storage/generated/{filename}",
+        }
+
+    @staticmethod
+    def _draw_element(draw: ImageDraw.ImageDraw, element: dict) -> None:
+        """绘制基础画布元素，导出覆盖文字、矩形、圆形和线条。"""
+        x = float(element["x"])
+        y = float(element["y"])
+        width = float(element["width"])
+        height = float(element["height"])
+        props = dict(element["props"] or {})
+        element_type = element["element_type"]
+        if element_type == "text":
+            content = str(props.get("content", ""))
+            color = str(props.get("color", "#111827"))
+            font_size = int(props.get("fontSize", 36))
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except OSError:
+                font = ImageFont.load_default()
+            draw.multiline_text((x, y), content, fill=color, font=font, spacing=6)
+        elif element_type == "rect":
+            draw.rectangle([x, y, x + width, y + height], fill=str(props.get("fill", "#0f766e")))
+        elif element_type == "circle":
+            draw.ellipse([x, y, x + width, y + height], fill=str(props.get("fill", "#b45309")))
+        elif element_type == "line":
+            draw.line([x, y, x + width, y + height], fill=str(props.get("stroke", "#111827")), width=int(props.get("strokeWidth", 4)))
 
     async def add_element(self, user_id: UUID, canvas_id: UUID, req: CanvasElementReq) -> dict:
         pool = await get_pool()

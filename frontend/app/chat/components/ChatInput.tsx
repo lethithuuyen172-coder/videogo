@@ -2,12 +2,23 @@
 
 import { Send } from "lucide-react";
 
-export function ChatInput({ value, setValue, onSend }: { value: string; setValue: (value: string) => void; onSend: () => void }) {
+export function ChatInput({
+  value,
+  setValue,
+  onSend,
+  disabled = false,
+}: {
+  value: string;
+  setValue: (value: string) => void;
+  onSend: () => void;
+  disabled?: boolean;
+}) {
   return (
     <div className="flex gap-2">
       <textarea
         className="max-h-32 min-h-12 flex-1 resize-none rounded-md border border-line p-3 text-sm"
         value={value}
+        disabled={disabled}
         maxLength={4000}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
@@ -17,7 +28,7 @@ export function ChatInput({ value, setValue, onSend }: { value: string; setValue
           }
         }}
       />
-      <button className="h-12 w-12 rounded-md bg-accent text-white" onClick={onSend} aria-label="发送">
+      <button className="h-12 w-12 rounded-md bg-accent text-white disabled:opacity-50" disabled={disabled} onClick={onSend} aria-label="发送">
         <Send className="mx-auto" size={18} />
       </button>
     </div>

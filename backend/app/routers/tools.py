@@ -35,7 +35,15 @@ async def create_tool_task(
 ) -> dict:
     """创建工具任务，V1.0 仅画质增强进入队列。"""
     row = await service.create_task(current_user["id"], tool_key, payload)
-    return ok({"id": str(row["id"]), "status": row["status"], "credit_cost": row["credit_cost"]}, request)
+    return ok(
+        {
+            "id": str(row["id"]),
+            "status": row["status"],
+            "credit_cost": row["credit_cost"],
+            "rq_job_id": row["rq_job_id"],
+        },
+        request,
+    )
 
 
 @router.get("/tasks/{task_id}")

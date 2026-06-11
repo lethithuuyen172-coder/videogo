@@ -19,6 +19,14 @@ type CreditRecord = {
   created_at: string;
 };
 
+const typeLabels: Record<string, string> = {
+  deduct: "消费",
+  recharge: "充值",
+  refund: "退款",
+  freeze: "冻结",
+  adjust: "调整",
+};
+
 export default function CreditsPage() {
   const [balance, setBalance] = useState<Balance | null>(null);
   const [records, setRecords] = useState<CreditRecord[]>([]);
@@ -40,6 +48,9 @@ export default function CreditsPage() {
         <div className="mt-1 text-sm text-slate-500">
           冻结 {balance?.frozen_credits ?? "--"}，可用 {balance?.available_credits ?? "--"}
         </div>
+        {balance && balance.available_credits <= 0 ? (
+          <div className="mt-3 rounded-md bg-yellow-50 p-3 text-sm text-signal">积分不足，去充值</div>
+        ) : null}
         <Link className="mt-4 inline-block rounded-md bg-accent px-3 py-2 text-sm text-white" href="/credits/recharge">
           充值
         </Link>
@@ -55,8 +66,8 @@ export default function CreditsPage() {
             ) : null}
             {records.map((record) => (
               <tr key={record.id} className="border-b border-line">
-                <td className="py-2">{record.description ?? record.record_type}</td>
-                <td>{record.amount}</td>
+                <td className="py-2">{record.description ?? typeLabels[record.record_type] ?? record.record_type}</td>
+                <td className={record.amount >= 0 ? "text-green-600" : "text-red-600"}>{record.amount > 0 ? `+${record.amount}` : record.amount}</td>
                 <td>{new Date(record.created_at).toLocaleString()}</td>
               </tr>
             ))}

@@ -21,12 +21,14 @@ export function VideoSettingsPanel({
   duration: number;
   setDuration: (value: number) => void;
 }) {
-  const [models, setModels] = useState<ProviderModel[]>([
-    { model_id: "mock-video", name: "Mock Video", status: "available", credit_cost: 10 },
-  ]);
+  const [models, setModels] = useState<ProviderModel[]>([]);
 
   useEffect(() => {
-    apiClient.get<ProviderModel[]>("/videos/models").then(setModels).catch(() => undefined);
+    apiClient.get<ProviderModel[]>("/videos/models").then((items) => {
+      setModels(items);
+      const preferred = items.find((item) => item.status === "configured" || item.status === "available");
+      if (preferred ?? items[0]) setModelId((preferred ?? items[0]).model_id);
+    }).catch(() => undefined);
   }, []);
 
   return (
@@ -43,6 +45,7 @@ export function VideoSettingsPanel({
               {model.name} · {model.status}
             </option>
           ))}
+          {models.length === 0 ? <option value="">加载中</option> : null}
         </select>
       </label>
       <label className="grid gap-1">
@@ -52,9 +55,9 @@ export function VideoSettingsPanel({
           value={duration}
           onChange={(event) => setDuration(Number(event.target.value))}
         >
-          <option value={15}>15秒</option>
-          <option value={30}>30秒</option>
-          <option value={40}>40秒</option>
+          <option value={4}>4秒 · Veo最小测试</option>
+          <option value={6}>6秒</option>
+          <option value={8}>8秒</option>
         </select>
       </label>
     </div>

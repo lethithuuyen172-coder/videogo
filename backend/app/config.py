@@ -38,17 +38,34 @@ class Settings(BaseSettings):
     r2_bucket_name: str = ""
 
     openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_chat_model: str = "gpt-4o-mini"
     gemini_api_key: str = ""
+    gemini_api_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_video_model: str = "veo-3.1-generate-preview"
     google_vertex_project: str = ""
     sdxl_api_key: str = ""
     flux_api_key: str = ""
     dalle_api_key: str = ""
     ideogram_api_key: str = ""
+    hfsy_image_api_keys: str = ""
+    hfsy_image_base_url: str = "https://www.hfsyapi.cn/v1/images/generations"
+    nexaxis_api_key: str = ""
+    nexaxis_api_keys: str = ""
+    nexaxis_base_url: str = "https://nexaxis.ai"
+    nexaxis_video_endpoint: str = "/v1/videos/generations"
+    nexaxis_video_model: str = "video-01"
+    joyai_echo_repo_path: str = ""
+    joyai_echo_python: str = "python"
+    joyai_echo_checkpoint: str = ""
+    joyai_echo_gemma_path: str = ""
+    joyai_echo_timeout_seconds: int = 7200
 
     free_daily_credit_limit: int = 5000
     default_new_user_credits: int = 100
     credit_unit_cny: float = 0.01
     request_timeout_seconds: float = 30.0
+    skip_db_startup: bool = False
 
     @field_validator("jwt_secret_key")
     @classmethod
@@ -72,7 +89,10 @@ class Settings(BaseSettings):
             }.items()
             if not value
         ]
-        if self.jwt_secret_key == "dev-only-change-me-please-32-bytes":
+        if self.jwt_secret_key in {
+            "dev-only-change-me-please-32-bytes",
+            "replace-with-32-char-random-string-here",
+        }:
             missing.append("JWT_SECRET_KEY(non-default)")
         if self.storage_backend == "r2":
             missing.extend(

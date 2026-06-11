@@ -41,7 +41,8 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         """应用生命周期，负责数据库连接池创建和关闭。"""
-        await create_pool()
+        if not settings.skip_db_startup:
+            await create_pool()
         try:
             yield
         finally:

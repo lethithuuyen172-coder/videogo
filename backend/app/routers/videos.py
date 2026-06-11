@@ -1,6 +1,6 @@
 """AI 视频生成 API，包含产品分析、FABE-S 脚本和 mock 任务闭环。"""
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
 
@@ -33,8 +33,44 @@ async def analyze_product(req: ProductAnalysisReq, request: Request, service: Ge
 
 @router.post("/scripts")
 async def generate_script(req: ScriptGenerateReq, request: Request, service: GenerationService = Depends(get_generation_service)) -> dict:
-    """按 FABE-S 框架生成脚本。"""
+    """按内置带货视频 Skill 模板生成脚本。"""
     return ok(service.generate_script(req), request)
+
+
+@router.post("/run-direct")
+async def run_video_direct(req: VideoCreateReq, request: Request) -> dict:
+    """直接调用视频 Provider，供本地无数据库时实时验收。"""
+    from app.core.provider_base import VideoGenParams
+
+    result = await provider_router.generate_video(
+        req.model_id,
+        VideoGenParams(
+            prompt=req.prompt,
+            duration_seconds=req.duration_seconds,
+            aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
+        ),
+    )
+    return ok(
+        {
+            "id": str(uuid4()),
+            "model_id": req.model_id,
+            "provider_key": result.provider,
+            "status": "succeeded",
+            "progress": 100,
+            "credit_cost": provider_router.estimate_video_cost(req.model_id, req.duration_seconds),
+            "output_url": result.url,
+            "error_code": None,
+            "error_message": None,
+        },
+        request,
+    )
+
+
+@router.get("/scripts/templates")
+async def script_templates(request: Request, service: GenerationService = Depends(get_generation_service)) -> dict:
+    """列出 108 个 TikTok/抖音带货视频脚本模板。"""
+    return ok(service.list_script_templates(), request)
 
 
 @router.post("")

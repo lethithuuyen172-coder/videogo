@@ -3,6 +3,7 @@ __pycache__/
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-basetemp/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -19,6 +20,9 @@ frontend/.env.local
 .env
 storage/
 *.log
+long-video-page*.png
+京东/JoyAI-Echo-main/
+京东/JoyAI-Echo-main.zip
 
 # OS / editor
 .DS_Store

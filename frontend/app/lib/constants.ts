@@ -4,6 +4,7 @@ export const API_BASE_URL =
 export const ROUTES = [
   { href: "/chat", label: "AI对话" },
   { href: "/video", label: "AI视频" },
+  { href: "/long-video", label: "长视频" },
   { href: "/image", label: "AI图片" },
   { href: "/canvas", label: "画布" },
   { href: "/tools", label: "工具箱" },

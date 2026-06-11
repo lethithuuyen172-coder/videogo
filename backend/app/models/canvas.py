@@ -39,7 +39,7 @@ class CanvasUpdateReq(BaseModel):
 class CanvasElementReq(BaseModel):
     """画布元素创建/更新请求。"""
 
-    element_type: Literal["image", "text", "shape", "sticker"]
+    element_type: Literal["image", "text", "rect", "circle", "line"]
     z_index: int = 0
     x: float = 0
     y: float = 0

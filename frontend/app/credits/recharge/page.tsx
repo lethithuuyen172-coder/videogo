@@ -17,13 +17,17 @@ type RechargeOrder = {
 export default function RechargePage() {
   const [order, setOrder] = useState<RechargeOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingCredits, setLoadingCredits] = useState<number | null>(null);
 
   const createOrder = async (credits: number) => {
     setError(null);
+    setLoadingCredits(credits);
     try {
       setOrder(await apiClient.post<RechargeOrder>("/credits/recharge-orders", { credits }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "创建充值订单失败");
+    } finally {
+      setLoadingCredits(null);
     }
   };
 
@@ -34,10 +38,11 @@ export default function RechargePage() {
           <button
             key={credits}
             className="rounded-md border border-line bg-white p-4 text-left hover:bg-panel"
+            disabled={loadingCredits !== null}
             onClick={() => createOrder(credits)}
           >
             <div className="text-lg font-semibold">{credits} 积分</div>
-            <div className="text-sm text-slate-500">约 ¥{credits / 100}</div>
+            <div className="text-sm text-slate-500">{loadingCredits === credits ? "创建中..." : `约 ¥${credits / 100}`}</div>
           </button>
         ))}
       </div>
@@ -48,6 +53,7 @@ export default function RechargePage() {
           <div className="mt-1 text-slate-500">
             {order.credits} 积分 · {order.status}
           </div>
+          <div className="mt-1 text-xs text-signal">开发模式支付链接</div>
           {order.checkout_url ? (
             <a className="mt-3 inline-block rounded-md bg-accent px-3 py-2 text-white" href={order.checkout_url}>
               前往支付

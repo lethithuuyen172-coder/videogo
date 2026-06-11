@@ -9,8 +9,13 @@ from app.core.provider_base import (
     ProviderResult,
     VideoGenParams,
 )
+from app.providers.google_veo_video_provider import GoogleVeoVideoProvider
+from app.providers.hfsy_image_provider import HFSYImageProvider
+from app.providers.joyai_echo_video_provider import JoyAIEchoVideoProvider
 from app.providers.mock_image_provider import MockImageProvider
 from app.providers.mock_video_provider import MockVideoProvider
+from app.providers.nexaxis_video_provider import NexaxisVideoProvider
+from app.providers.openai_image_provider import OpenAIImageProvider
 from app.providers.stub_providers import (
     ComingSoonVideoProvider,
     ConfigurableImageProvider,
@@ -29,7 +34,9 @@ class ProviderRouter:
     def _register_defaults(self) -> None:
         video = [
             MockVideoProvider(),
-            ConfigurableVideoProvider("google_gemini", "google-veo-gemini", "Google Veo Gemini", "gemini_api_key"),
+            NexaxisVideoProvider(),
+            GoogleVeoVideoProvider(),
+            JoyAIEchoVideoProvider(),
             ConfigurableVideoProvider("google_vertex", "google-veo-vertex", "Google Veo Vertex", "google_vertex_project"),
             ComingSoonVideoProvider("seedance", "seedance-video", "Seedance"),
             ComingSoonVideoProvider("kling", "kling-video", "Kling"),
@@ -39,7 +46,9 @@ class ProviderRouter:
             MockImageProvider(),
             ConfigurableImageProvider("flux", "flux-schnell", "Flux Schnell", "flux_api_key"),
             ConfigurableImageProvider("sdxl", "sdxl-turbo", "SDXL Turbo", "sdxl_api_key"),
-            ConfigurableImageProvider("dalle", "dalle-3", "DALL-E 3", "dalle_api_key"),
+            ConfigurableImageProvider("dalle", "dalle-compatible", "DALL-E Compatible", "openai_api_key"),
+            OpenAIImageProvider(),
+            HFSYImageProvider(),
             ConfigurableImageProvider("ideogram", "ideogram-v2", "Ideogram", "ideogram_api_key"),
         ]
         for provider in video:
