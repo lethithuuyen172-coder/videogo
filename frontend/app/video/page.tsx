@@ -22,6 +22,14 @@ type GeneratedScript = {
   video_prompt: string;
 };
 
+type Material = {
+  id: string;
+  title: string;
+  material_type: string;
+  url?: string;
+  status: string;
+};
+
 export default function VideoPage() {
   const [prompt, setPrompt] = useState("真实测评一款适合TikTok带货的智能小家电");
   const [modelId, setModelId] = useState("");
@@ -35,6 +43,8 @@ export default function VideoPage() {
   const [targetMarket, setTargetMarket] = useState("US");
   const [targetAudience, setTargetAudience] = useState("25-40岁短视频购物用户");
   const [referenceAsset, setReferenceAsset] = useState("");
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [showMaterials, setShowMaterials] = useState(false);
   const [batchCount, setBatchCount] = useState(1);
   const [script, setScript] = useState<GeneratedScript | null>(null);
   const [scriptError, setScriptError] = useState("");
@@ -55,6 +65,9 @@ export default function VideoPage() {
 
   useEffect(() => {
     apiClient.get<ScriptTemplate[]>("/videos/scripts/templates").then(setTemplates).catch(() => undefined);
+    apiClient.get<Material[]>("/materials").then((items) => {
+      setMaterials(items.filter((item) => item.material_type === "image" || item.material_type === "video"));
+    }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -185,11 +198,29 @@ export default function VideoPage() {
                 onChange={(event) => setReferenceAsset(event.target.value)}
                 placeholder="粘贴商品图、视频、素材 ID 或参考图 URL"
               />
-              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white text-sm font-semibold text-[#0071e3]">
+              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white text-sm font-semibold text-[#0071e3]" onClick={() => setShowMaterials((value) => !value)}>
                 <ImagePlus size={16} />
                 选择素材
               </button>
             </div>
+            {showMaterials ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {materials.length === 0 ? <div className="rounded-lg border border-dashed border-black/15 p-4 text-sm text-[#86868b]">暂无可选图片或视频素材</div> : null}
+                {materials.slice(0, 6).map((material) => (
+                  <button
+                    key={material.id}
+                    className="rounded-lg border border-black/10 bg-white p-3 text-left text-sm hover:border-[#0071e3]"
+                    onClick={() => {
+                      setReferenceAsset(material.url || material.id);
+                      setShowMaterials(false);
+                    }}
+                  >
+                    <div className="truncate font-semibold">{material.title}</div>
+                    <div className="mt-1 text-xs text-[#86868b]">{material.material_type} · {material.status}</div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </Panel>
 
           <Panel title="提示词">

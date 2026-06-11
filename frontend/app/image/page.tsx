@@ -3,9 +3,18 @@
 import { useEffect, useState } from "react";
 import { Clock3, ImagePlus, Layers3, Sparkles } from "lucide-react";
 import { OpenAIKeyBox } from "@/components/OpenAIKeyBox";
+import { apiClient } from "@/lib/api";
 import { ImagePreview } from "./components/ImagePreview";
 import { ImageSettingsPanel } from "./components/ImageSettingsPanel";
 import { useImageGeneration } from "./hooks/useImageGeneration";
+
+type Material = {
+  id: string;
+  title: string;
+  material_type: string;
+  url?: string;
+  status: string;
+};
 
 export default function ImagePage() {
   const [prompt, setPrompt] = useState("一张高转化电商产品主图，干净背景，真实光影");
@@ -14,6 +23,8 @@ export default function ImagePage() {
   const [styleKey, setStyleKey] = useState("");
   const [runMode, setRunMode] = useState<"sync" | "queue">("sync");
   const [referenceAsset, setReferenceAsset] = useState("");
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [showMaterials, setShowMaterials] = useState(false);
   const [batchCount, setBatchCount] = useState(1);
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const { job, error, isRunning, createJob } = useImageGeneration();
@@ -29,6 +40,10 @@ export default function ImagePage() {
       setPrompt([subjectParam ? `主体：${subjectParam}` : null, promptParam].filter(Boolean).join("\n").slice(0, 2000));
     }
     if (referenceParam) setReferenceAsset(referenceParam);
+  }, []);
+
+  useEffect(() => {
+    apiClient.get<Material[]>("/materials?material_type=image").then(setMaterials).catch(() => undefined);
   }, []);
 
   const submitImage = () => {
@@ -107,11 +122,29 @@ export default function ImagePage() {
                 onChange={(event) => setReferenceAsset(event.target.value)}
                 placeholder="粘贴参考图、商品图、素材 ID 或 URL"
               />
-              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white text-sm font-semibold text-[#0071e3]">
+              <button className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white text-sm font-semibold text-[#0071e3]" onClick={() => setShowMaterials((value) => !value)}>
                 <ImagePlus size={16} />
                 选择素材
               </button>
             </div>
+            {showMaterials ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {materials.length === 0 ? <div className="rounded-lg border border-dashed border-black/15 p-4 text-sm text-[#86868b]">暂无可选图片素材</div> : null}
+                {materials.slice(0, 6).map((material) => (
+                  <button
+                    key={material.id}
+                    className="rounded-lg border border-black/10 bg-white p-3 text-left text-sm hover:border-[#0071e3]"
+                    onClick={() => {
+                      setReferenceAsset(material.url || material.id);
+                      setShowMaterials(false);
+                    }}
+                  >
+                    <div className="truncate font-semibold">{material.title}</div>
+                    <div className="mt-1 text-xs text-[#86868b]">{material.material_type} · {material.status}</div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </Panel>
 
           <Panel title="提示词">
