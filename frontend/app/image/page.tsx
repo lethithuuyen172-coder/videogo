@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock3, ImagePlus, Layers3, Sparkles } from "lucide-react";
 import { OpenAIKeyBox } from "@/components/OpenAIKeyBox";
 import { ImagePreview } from "./components/ImagePreview";
@@ -19,6 +19,17 @@ export default function ImagePage() {
   const { job, error, isRunning, createJob } = useImageGeneration();
   const effectiveRunMode = modelId === "dalle-3" ? "sync" : runMode;
   const estimatedCredits = (resolution === "2048" ? 80 : resolution === "1024" ? 30 : 10) * batchCount;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const promptParam = searchParams.get("prompt");
+    const referenceParam = searchParams.get("reference");
+    const subjectParam = searchParams.get("subject");
+    if (promptParam || subjectParam) {
+      setPrompt([subjectParam ? `主体：${subjectParam}` : null, promptParam].filter(Boolean).join("\n").slice(0, 2000));
+    }
+    if (referenceParam) setReferenceAsset(referenceParam);
+  }, []);
 
   const submitImage = () => {
     createJob(

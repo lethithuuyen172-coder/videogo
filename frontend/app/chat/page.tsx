@@ -59,6 +59,16 @@ export default function ChatPage() {
   const activeSkill = useMemo(() => skills.find((item) => item.key === skill) ?? skills[0], [skill]);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const prompt = searchParams.get("prompt");
+    const referenceParam = searchParams.get("reference");
+    const subjectParam = searchParams.get("subject");
+    if (prompt) setInput(prompt);
+    if (referenceParam) setReference(referenceParam);
+    if (subjectParam) setSubject(subjectParam);
+  }, []);
+
+  useEffect(() => {
     apiClient.get<Conversation[]>("/conversations").then((items) => {
       setConversations(items);
       if (items[0]) setConversationId(items[0].id);

@@ -44,6 +44,16 @@ export default function VideoPage() {
   const estimatedCredits = Math.max(10, duration * 8) * batchCount;
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const promptParam = searchParams.get("prompt");
+    const referenceParam = searchParams.get("reference");
+    const subjectParam = searchParams.get("subject");
+    if (promptParam) setPrompt(promptParam.slice(0, 4000));
+    if (referenceParam) setReferenceAsset(referenceParam);
+    if (subjectParam) setProductName(subjectParam);
+  }, []);
+
+  useEffect(() => {
     apiClient.get<ScriptTemplate[]>("/videos/scripts/templates").then(setTemplates).catch(() => undefined);
   }, []);
 
