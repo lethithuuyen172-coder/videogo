@@ -1,15 +1,39 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import {
+  ArrowUpRight,
+  AtSign,
   Boxes,
   Brush,
   CircleDollarSign,
+  FileUp,
   Image as ImageIcon,
   MessageSquareText,
   Scissors,
+  Send,
   Sparkles,
   Video,
   WandSparkles,
 } from "lucide-react";
+
+const modes = [
+  { key: "agent", label: "Agent", href: "/chat", icon: MessageSquareText },
+  { key: "video", label: "AI 视频", href: "/video", icon: Video },
+  { key: "image", label: "AI 图片", href: "/image", icon: ImageIcon },
+  { key: "canvas", label: "画布", href: "/canvas", icon: Brush },
+];
+
+const skillChips = [
+  { label: "画质增强", href: "/tools/enhance" },
+  { label: "去水印", href: "/tools/watermark-remover" },
+  { label: "去字幕", href: "/tools/subtitle-remover" },
+  { label: "爆款裂变", href: "/tools/viral-variant" },
+  { label: "反推提示词", href: "/tools/prompt-reverse" },
+  { label: "视频提示词", href: "/tools/video-prompt" },
+];
 
 const creationFlows = [
   {
@@ -44,7 +68,7 @@ const creationFlows = [
     href: "/canvas",
     icon: Brush,
     title: "在线画布",
-    desc: "编辑封面、商品图、广告素材并导出 PNG。",
+    desc: "模板化编辑封面、商品图、广告素材并导出。",
     accent: "bg-[#ff375f]",
   },
   {
@@ -56,33 +80,117 @@ const creationFlows = [
   },
 ];
 
-const pipeline = ["上传商品/素材", "Agent 生成脚本", "图片/视频生成", "画布包装", "工具增强", "资产沉淀"];
+const pipeline = ["参考素材", "输入文字", "@主体", "Agent 拆解", "生成/处理", "资产沉淀"];
 
 export default function HomePage() {
+  const router = useRouter();
+  const [mode, setMode] = useState(modes[0].key);
+  const [prompt, setPrompt] = useState("帮我把一款 TikTok 带货商品做成高转化视频素材");
+  const [reference, setReference] = useState("");
+  const [subject, setSubject] = useState("");
+
+  const activeMode = useMemo(() => modes.find((item) => item.key === mode) ?? modes[0], [mode]);
+
+  const launch = () => {
+    const params = new URLSearchParams();
+    if (prompt.trim()) params.set("prompt", prompt.trim());
+    if (reference.trim()) params.set("reference", reference.trim());
+    if (subject.trim()) params.set("subject", subject.trim());
+    const query = params.toString();
+    router.push(`${activeMode.href}${query ? `?${query}` : ""}`);
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
-      <section className="rounded-lg border border-black/10 bg-white/80 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#0071e3]">VideoGo Creative OS</p>
-            <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
-              从商品到可投放视频的一站式 AI 工作台
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#6e6e73]">
-              覆盖 AI 对话、视频、长视频、图片、画布、工具箱、资产和积分，先复刻主流 AI 创作站的完整功能面，再在带货转化链路上继续迭代。
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link className="rounded-full bg-[#0071e3] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,113,227,0.28)]" href="/chat">
-                开始创作
-              </Link>
-              <Link className="rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-[#0071e3]" href="/long-video">
-                编排长视频
-              </Link>
-            </div>
+      <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+        <div className="mx-auto max-w-5xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0071e3]">VideoGo Creative OS</p>
+          <h1 className="mx-auto mt-3 max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
+            你想创作什么？
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-[#6e6e73]">
+            从一个输入框开始，覆盖 AI 对话、视频、图片、画布、工具、资产和积分，并在带货转化链路上继续迭代。
+          </p>
+        </div>
+
+        <div className="mx-auto mt-7 max-w-4xl rounded-[28px] border border-black/10 bg-[#f5f5f7] p-3 shadow-inner">
+          <div className="grid gap-2 md:grid-cols-2">
+            <LabeledInput icon={FileUp} label="参考素材" value={reference} onChange={setReference} placeholder="粘贴商品图、视频、素材 ID 或竞品链接" />
+            <LabeledInput icon={AtSign} label="@主体" value={subject} onChange={setSubject} placeholder="商品、角色、品牌或目标人群" />
           </div>
-          <div className="rounded-lg bg-[#1d1d1f] p-5 text-white">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Boxes size={18} />
+          <textarea
+            className="mt-3 min-h-32 w-full resize-none rounded-[22px] border border-black/10 bg-white px-5 py-4 text-base outline-none transition placeholder:text-[#86868b] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
+            value={prompt}
+            maxLength={4000}
+            placeholder="输入文字，或描述你要生成的视频、图片、脚本、画布..."
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                launch();
+              }
+            }}
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {modes.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  className={`inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold transition ${
+                    mode === item.key ? "bg-[#1d1d1f] text-white" : "bg-white text-[#6e6e73] hover:text-[#1d1d1f]"
+                  }`}
+                  onClick={() => setMode(item.key)}
+                >
+                  <Icon size={16} />
+                  {item.label}
+                </button>
+              );
+            })}
+            <button className="ml-auto inline-flex h-11 items-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,113,227,0.28)]" onClick={launch}>
+              开始
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-4 flex max-w-4xl flex-wrap justify-center gap-2">
+          {skillChips.map((item) => (
+            <Link key={item.href} className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]" href={item.href}>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {creationFlows.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                className="group rounded-lg border border-black/10 bg-white/85 p-5 shadow-[0_10px_34px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(0,0,0,0.09)]"
+                href={item.href}
+              >
+                <div className={`grid h-11 w-11 place-items-center rounded-full text-white ${item.accent}`}>
+                  <Icon size={20} />
+                </div>
+                <div className="mt-5 text-lg font-semibold">{item.title}</div>
+                <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{item.desc}</p>
+                <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#0071e3]">
+                  打开模块
+                  <WandSparkles size={16} className="transition group-hover:rotate-12" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        <aside className="grid h-fit gap-4">
+          <section className="rounded-lg bg-[#1d1d1f] p-5 text-white shadow-[0_18px_60px_rgba(0,0,0,0.16)]">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/72">
+              <Boxes size={18} className="text-[#0a84ff]" />
               创作流水线
             </div>
             <div className="mt-4 grid gap-2">
@@ -95,48 +203,60 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {creationFlows.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              className="group rounded-lg border border-black/10 bg-white/85 p-5 shadow-[0_10px_34px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(0,0,0,0.09)]"
-              href={item.href}
-            >
-              <div className={`grid h-11 w-11 place-items-center rounded-full text-white ${item.accent}`}>
-                <Icon size={20} />
-              </div>
-              <div className="mt-5 text-lg font-semibold">{item.title}</div>
-              <p className="mt-2 text-sm leading-6 text-[#6e6e73]">{item.desc}</p>
-              <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#0071e3]">
-                打开模块
-                <WandSparkles size={16} className="transition group-hover:rotate-12" />
-              </div>
-            </Link>
-          );
-        })}
-      </section>
-
-      <section className="mt-5 grid gap-4 lg:grid-cols-3">
-        {[
-          { href: "/assets", title: "资产中心", text: "集中管理上传素材、生成结果和可复用商品资产。" },
-          { href: "/credits", title: "积分与充值", text: "查看额度、充值套餐、消耗记录和任务成本。" },
-          { href: "/discover", title: "发现社区", text: "沉淀优秀作品、分镜结构和可复刻创作范式。" },
-        ].map((item) => (
-          <Link key={item.href} className="rounded-lg border border-black/10 bg-white/70 p-4 text-sm shadow-sm" href={item.href}>
-            <div className="flex items-center gap-2 font-semibold">
-              <CircleDollarSign size={16} className="text-[#0071e3]" />
-              {item.title}
+          <section className="rounded-lg border border-black/10 bg-white/85 p-4 shadow-[0_10px_34px_rgba(0,0,0,0.05)]">
+            <h2 className="text-sm font-semibold">商业闭环</h2>
+            <div className="mt-3 grid gap-2">
+              {[
+                { href: "/assets", title: "资产中心", text: "沉淀素材和生成结果。" },
+                { href: "/credits", title: "积分与充值", text: "额度、套餐和消耗记录。" },
+                { href: "/discover", title: "发现社区", text: "作品流和可复刻模板。" },
+              ].map((item) => (
+                <Link key={item.href} className="rounded-lg bg-[#f5f5f7] p-3 text-sm" href={item.href}>
+                  <div className="flex items-center justify-between font-semibold">
+                    <span className="flex items-center gap-2">
+                      <CircleDollarSign size={15} className="text-[#0071e3]" />
+                      {item.title}
+                    </span>
+                    <ArrowUpRight size={14} className="text-[#86868b]" />
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{item.text}</p>
+                </Link>
+              ))}
             </div>
-            <p className="mt-2 leading-6 text-[#6e6e73]">{item.text}</p>
-          </Link>
-        ))}
+          </section>
+        </aside>
       </section>
     </div>
+  );
+}
+
+function LabeledInput({
+  icon: Icon,
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  icon: typeof FileUp;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="grid gap-1 rounded-[18px] bg-white px-4 py-3 text-xs text-[#86868b]">
+      <span className="flex items-center gap-1 font-semibold text-[#1d1d1f]">
+        <Icon size={14} className="text-[#0071e3]" />
+        {label}
+      </span>
+      <input
+        className="bg-transparent text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b]"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
   );
 }
