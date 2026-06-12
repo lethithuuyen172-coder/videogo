@@ -6,6 +6,7 @@ export const ROUTES = [
   { href: "/video", label: "AI视频" },
   { href: "/long-video", label: "长视频" },
   { href: "/image", label: "AI图片" },
+  { href: "/tasks", label: "任务" },
   { href: "/canvas", label: "画布" },
   { href: "/tools", label: "工具箱" },
   { href: "/assets", label: "资产" },

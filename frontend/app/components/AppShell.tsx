@@ -18,7 +18,7 @@ import { ROUTES } from "@/lib/constants";
 const navGroups = [
   {
     title: "创作",
-    items: ROUTES.filter((item) => ["/chat", "/video", "/long-video", "/image", "/canvas", "/tools"].includes(item.href)),
+    items: ROUTES.filter((item) => ["/chat", "/video", "/long-video", "/image", "/tasks", "/canvas", "/tools"].includes(item.href)),
   },
   {
     title: "运营",
