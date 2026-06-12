@@ -13,6 +13,7 @@ import {
   Sparkles,
   Upload,
   Video,
+  Image as ImageIcon,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
@@ -29,6 +30,14 @@ type ToolTask = {
   rq_job_id?: string | null;
 };
 
+type Material = {
+  id: string;
+  title: string;
+  material_type: string;
+  url?: string | null;
+  status: string;
+};
+
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default function EnhancePage() {
@@ -37,6 +46,9 @@ export default function EnhancePage() {
   const [fps, setFps] = useState(60);
   const [denoise, setDenoise] = useState("medium");
   const [asset, setAsset] = useState("");
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [showMaterials, setShowMaterials] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [notes, setNotes] = useState("提升商品视频清晰度，保留真实质感和字幕可读性");
   const [task, setTask] = useState<ToolTask | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +60,9 @@ export default function EnhancePage() {
       setResolution(next.resolutions.at(-1) ?? "4K");
       setFps(next.fps.at(-1) ?? 60);
       setDenoise(next.denoise[1] ?? next.denoise[0] ?? "medium");
+    }).catch(() => undefined);
+    apiClient.get<Material[]>("/materials").then((items) => {
+      setMaterials(items.filter((item) => item.material_type === "image" || item.material_type === "video"));
     }).catch(() => undefined);
   }, []);
 
@@ -156,13 +171,53 @@ export default function EnhancePage() {
         <main className="grid gap-4">
           <Panel title="素材与目标">
             <Field label="素材链接 / 素材 ID">
-              <input
-                className="control"
-                value={asset}
-                onChange={(event) => setAsset(event.target.value)}
-                placeholder="粘贴视频、图片、素材 ID 或存储 URL"
-              />
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
+                <input
+                  className="control"
+                  value={asset}
+                  onChange={(event) => {
+                    setAsset(event.target.value);
+                    setSelectedMaterial(null);
+                  }}
+                  placeholder="粘贴视频、图片、素材 ID 或存储 URL"
+                />
+                <button className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white text-sm font-semibold text-[#0071e3]" onClick={() => setShowMaterials((value) => !value)}>
+                  <ImageIcon size={16} />
+                  选择素材
+                </button>
+              </div>
             </Field>
+            {showMaterials ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {materials.length === 0 ? <div className="rounded-lg border border-dashed border-black/15 p-4 text-sm text-[#86868b]">暂无可选图片或视频素材，先去资产中心上传。</div> : null}
+                {materials.slice(0, 8).map((material) => (
+                  <button
+                    key={material.id}
+                    className="grid grid-cols-[56px_1fr] items-center gap-3 rounded-lg border border-black/10 bg-white p-2 text-left text-sm hover:border-[#0071e3]"
+                    onClick={() => {
+                      setAsset(material.id);
+                      setSelectedMaterial(material);
+                      setShowMaterials(false);
+                    }}
+                  >
+                    <div className="h-14 overflow-hidden rounded-md bg-[#f5f5f7]">
+                      {material.material_type === "image" && material.url ? <img className="h-full w-full object-cover" src={material.url} alt={material.title} /> : null}
+                      {material.material_type === "video" && material.url ? <video className="h-full w-full object-cover" src={material.url} /> : null}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{material.title}</div>
+                      <div className="mt-1 text-xs text-[#86868b]">{material.material_type} · {material.status}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {selectedMaterial ? (
+              <div className="mt-3 rounded-lg border border-[#0071e3]/20 bg-[#f2f8ff] p-3 text-sm">
+                <div className="font-semibold text-[#0071e3]">已选择：{selectedMaterial.title}</div>
+                <div className="mt-1 text-xs text-[#6e6e73]">{selectedMaterial.id}</div>
+              </div>
+            ) : null}
             <Field label="处理说明">
               <textarea
                 className="min-h-36 w-full resize-none rounded-lg border border-black/10 bg-[#f5f5f7] p-3 text-sm leading-6 outline-none focus:border-[#0071e3] focus:bg-white focus:ring-4 focus:ring-[#0071e3]/10"
