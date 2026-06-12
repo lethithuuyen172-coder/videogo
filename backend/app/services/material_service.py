@@ -8,7 +8,8 @@ from fastapi import UploadFile
 from app.core.database import get_pool
 from app.core.exceptions import AppError
 from app.core.storage import get_storage
-from app.models.materials import MaterialUpdateReq
+from app.models.materials import MaterialDispatchReq, MaterialUpdateReq
+from app.services.event_service import event_service
 
 
 class MaterialService:
@@ -121,6 +122,28 @@ class MaterialService:
                 material_id,
             )
         return [dict(row) for row in rows]
+
+    async def dispatch(self, user_id: UUID, material_id: UUID, req: MaterialDispatchReq) -> dict:
+        material = await self.get(user_id, material_id)
+        await event_service.log_material_usage_event(
+            user_id,
+            material_id,
+            req.action,
+            req.target_type,
+            req.target_id,
+            {
+                "target_route": req.target_route,
+                "material_type": material["material_type"],
+                "title": material["title"],
+                "url": material.get("url"),
+            },
+        )
+        return {
+            "material_id": str(material_id),
+            "target_type": req.target_type,
+            "target_route": req.target_route,
+            "dispatched": True,
+        }
 
     @staticmethod
     def _type_from_mime(content_type: str) -> str:

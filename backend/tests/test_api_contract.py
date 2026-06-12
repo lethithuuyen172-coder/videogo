@@ -222,6 +222,27 @@ def test_homepage_dispatches_modes_and_da_style_skills() -> None:
     assert 'subject_material_id: searchParams.get("subject_material_id") ?? ""' in context_helper
 
 
+def test_assets_page_dispatches_materials_to_creation_workspaces() -> None:
+    """资产中心必须提供下载、复制 URL 和跨工作台复用动作。"""
+    assets = (ROOT / "frontend/app/assets/page.tsx").read_text(encoding="utf-8")
+    for snippet in [
+        "downloadMaterial",
+        "copyMaterialUrl",
+        "dispatchMaterial",
+        'apiClient.post(`/materials/${material.id}/dispatch`',
+        'href: "/image"',
+        'href: "/video"',
+        'href: "/long-video"',
+        'href: "/canvas"',
+        'href: "/tools/video-quality-enhance"',
+        'href: "/tools/hot-video-remix"',
+        "subject_material_id",
+        "navigator.clipboard.writeText",
+        "anchor.download",
+    ]:
+        assert snippet in assets
+
+
 def test_frontend_global_shell_and_error_pages_cover_mobile_acceptance() -> None:
     """全局壳必须覆盖侧边栏登录态、移动底部导航、404 和错误页。"""
     shell = (ROOT / "frontend/app/components/AppShell.tsx").read_text(encoding="utf-8")

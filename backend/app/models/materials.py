@@ -15,6 +15,15 @@ class MaterialUpdateReq(BaseModel):
     is_subject: bool | None = None
 
 
+class MaterialDispatchReq(BaseModel):
+    """素材派发到生成器、画布或工具的事件请求。"""
+
+    action: str = Field(default="use_as_input", max_length=80)
+    target_type: str = Field(max_length=40)
+    target_id: UUID | None = None
+    target_route: str | None = Field(default=None, max_length=160)
+
+
 class MaterialResp(BaseModel):
     """素材响应对象。"""
 

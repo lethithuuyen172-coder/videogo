@@ -7,7 +7,8 @@ import pytest
 from pydantic import ValidationError
 
 from app.main import app
-from app.models.materials import MaterialResp, MaterialUpdateReq
+from app.models.materials import MaterialDispatchReq, MaterialResp, MaterialUpdateReq
+from app.services import material_service as material_module
 from app.services.material_service import MaterialService
 
 
@@ -64,3 +65,55 @@ def test_material_update_and_response_support_subject_flag() -> None:
         created_at=datetime.now(UTC),
     )
     assert material.is_subject is True
+
+
+def test_material_dispatch_route_and_model_contract() -> None:
+    """素材派发接口必须存在，并携带目标类型和路由上下文。"""
+    paths = app.openapi()["paths"]
+    assert "/api/v1/materials/{material_id}/dispatch" in paths
+    req = MaterialDispatchReq(target_type="image", target_route="/image")
+    assert req.action == "use_as_input"
+    assert req.target_type == "image"
+
+
+@pytest.mark.asyncio
+async def test_material_dispatch_logs_usage_event(monkeypatch) -> None:
+    """素材派发必须写入 material_usage_events 的服务层入口。"""
+    calls: list[tuple] = []
+    user_id = uuid4()
+    material_id = uuid4()
+
+    class FakeMaterialService(MaterialService):
+        async def get(self, user_id_arg, material_id_arg) -> dict:
+            assert user_id_arg == user_id
+            assert material_id_arg == material_id
+            return {
+                "id": material_id,
+                "material_type": "image",
+                "title": "商品图",
+                "url": "http://localhost:8000/storage/a.png",
+            }
+
+    class FakeEventService:
+        async def log_material_usage_event(
+            self,
+            user_id_arg,
+            material_id_arg,
+            action,
+            target_type=None,
+            target_id=None,
+            payload=None,
+        ) -> None:
+            calls.append((user_id_arg, material_id_arg, action, target_type, target_id, payload))
+
+    monkeypatch.setattr(material_module, "event_service", FakeEventService())
+
+    result = await FakeMaterialService().dispatch(
+        user_id,
+        material_id,
+        MaterialDispatchReq(target_type="image", target_route="/image"),
+    )
+
+    assert result["dispatched"] is True
+    assert calls[0][0:4] == (user_id, material_id, "use_as_input", "image")
+    assert calls[0][5]["target_route"] == "/image"

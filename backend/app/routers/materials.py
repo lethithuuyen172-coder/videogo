@@ -5,7 +5,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.core.responses import ok
-from app.models.materials import MaterialReferenceResp, MaterialResp, MaterialUpdateReq
+from app.models.materials import (
+    MaterialDispatchReq,
+    MaterialReferenceResp,
+    MaterialResp,
+    MaterialUpdateReq,
+)
 from app.routers.auth import get_current_user
 from app.services.material_service import MaterialService
 
@@ -91,6 +96,18 @@ async def material_references(
     """查询素材引用链。"""
     refs = await service.references(current_user["id"], material_id)
     return ok([MaterialReferenceResp(**ref).model_dump(mode="json") for ref in refs], request)
+
+
+@router.post("/{material_id}/dispatch")
+async def dispatch_material(
+    material_id: UUID,
+    req: MaterialDispatchReq,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service),
+) -> dict:
+    """记录素材派发到生成器、画布或工具的复用事件。"""
+    return ok(await service.dispatch(current_user["id"], material_id, req), request)
 
 
 @router.post("/upload-url")

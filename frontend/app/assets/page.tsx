@@ -1,7 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileText, GitBranch, Grid2X2, Image as ImageIcon, List, Save, Search, Trash2, Upload, Video, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Brush,
+  Copy,
+  Download,
+  FileText,
+  GitBranch,
+  Grid2X2,
+  Image as ImageIcon,
+  List,
+  Save,
+  Search,
+  Sparkles,
+  Trash2,
+  Upload,
+  Video,
+  WandSparkles,
+  X,
+} from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 type Material = {
@@ -12,6 +30,7 @@ type Material = {
   mime_type?: string | null;
   size_bytes?: number | null;
   tags?: string[];
+  is_subject?: boolean;
   status: string;
   created_at?: string;
 };
@@ -38,7 +57,19 @@ const typeIcon: Record<string, typeof ImageIcon> = {
   text: FileText,
 };
 
+const dispatchTargets = {
+  image: { label: "用作图片", href: "/image", icon: ImageIcon },
+  video: { label: "用作视频", href: "/video", icon: Video },
+  longVideo: { label: "用作长视频", href: "/long-video", icon: Sparkles },
+  canvas: { label: "用到画布", href: "/canvas", icon: Brush },
+  enhance: { label: "画质增强", href: "/tools/video-quality-enhance", icon: WandSparkles },
+  remix: { label: "爆款裂变", href: "/tools/hot-video-remix", icon: Sparkles },
+} as const;
+
+type DispatchTargetKey = keyof typeof dispatchTargets;
+
 export default function AssetsPage() {
+  const router = useRouter();
   const [activeType, setActiveType] = useState<string | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [preview, setPreview] = useState<Material | null>(null);
@@ -55,6 +86,7 @@ export default function AssetsPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchDeleting, setBatchDeleting] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const load = () => {
     const query = activeType ? `?material_type=${activeType}` : "";
@@ -198,6 +230,57 @@ export default function AssetsPage() {
     }
   };
 
+  const availableTargets = (material: Material): DispatchTargetKey[] => {
+    if (material.material_type === "image") return ["image", "canvas", "enhance"];
+    if (material.material_type === "video") return ["video", "longVideo", "enhance", "remix"];
+    return ["canvas"];
+  };
+
+  const buildDispatchUrl = (material: Material, href: string) => {
+    const params = new URLSearchParams();
+    params.set("reference", material.url || material.id);
+    params.set("subject", material.title);
+    if (material.is_subject) params.set("subject_material_id", material.id);
+    return `${href}?${params.toString()}`;
+  };
+
+  const copyMaterialUrl = async (material: Material) => {
+    if (!material.url) {
+      setActionNotice("该素材暂无可复制 URL");
+      return;
+    }
+    await navigator.clipboard.writeText(material.url);
+    setActionNotice("已复制素材 URL");
+  };
+
+  const downloadMaterial = (material: Material) => {
+    if (!material.url) {
+      setActionNotice("该素材暂无可下载文件");
+      return;
+    }
+    const anchor = document.createElement("a");
+    anchor.href = material.url;
+    anchor.download = material.title || material.id;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setActionNotice("已开始下载");
+  };
+
+  const dispatchMaterial = async (material: Material, targetKey: DispatchTargetKey) => {
+    const target = dispatchTargets[targetKey];
+    try {
+      await apiClient.post(`/materials/${material.id}/dispatch`, {
+        action: "use_as_input",
+        target_type: targetKey,
+        target_route: target.href,
+      });
+    } catch (err) {
+      setActionNotice(err instanceof Error ? err.message : "素材派发记录失败，仍会继续打开工作台");
+    }
+    router.push(buildDispatchUrl(material, target.href));
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
       <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
@@ -305,6 +388,7 @@ export default function AssetsPage() {
             </div>
           </div>
           {error ? <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+          {actionNotice ? <div className="mb-3 rounded-lg bg-[#e8f2ff] p-3 text-sm font-semibold text-[#0071e3]">{actionNotice}</div> : null}
           {filtered.length === 0 && !error ? (
             <div className="rounded-lg border border-dashed border-black/10 bg-[#f5f5f7] p-10 text-center text-sm text-[#6e6e73]">
               暂无素材。先上传商品图、视频参考或生成结果。
@@ -331,10 +415,27 @@ export default function AssetsPage() {
                     <div className="font-semibold">{item.title}</div>
                     <div className="mt-1 text-xs text-[#86868b]">{item.material_type} · {item.status}</div>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <button className="rounded-full border border-black/10 p-2 text-[#0071e3]" aria-label="下载">
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded-full border border-black/10 p-2 text-[#0071e3]" onClick={() => downloadMaterial(item)} aria-label="下载">
                       <Download size={15} />
                     </button>
+                    <button className="rounded-full border border-black/10 p-2 text-[#0071e3]" onClick={() => copyMaterialUrl(item)} aria-label="复制URL">
+                      <Copy size={15} />
+                    </button>
+                    {availableTargets(item).slice(0, 3).map((targetKey) => {
+                      const target = dispatchTargets[targetKey];
+                      const TargetIcon = target.icon;
+                      return (
+                        <button
+                          key={targetKey}
+                          className="inline-flex items-center gap-1 rounded-full border border-black/10 px-2 py-2 text-xs font-semibold text-[#0071e3]"
+                          onClick={() => void dispatchMaterial(item, targetKey)}
+                        >
+                          <TargetIcon size={14} />
+                          {target.label}
+                        </button>
+                      );
+                    })}
                     <button className="rounded-full border border-black/10 p-2 text-red-600" onClick={() => remove(item)} aria-label="删除">
                       <Trash2 size={15} />
                     </button>
@@ -380,6 +481,36 @@ export default function AssetsPage() {
                   <Info label="状态" value={preview.status} />
                   <Info label="MIME" value={preview.mime_type ?? "--"} />
                   <Info label="大小" value={formatBytes(preview.size_bytes)} />
+                </div>
+
+                <div className="mt-5 grid gap-2">
+                  <div className="text-sm font-semibold">复用到工作台</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableTargets(preview).map((targetKey) => {
+                      const target = dispatchTargets[targetKey];
+                      const TargetIcon = target.icon;
+                      return (
+                        <button
+                          key={targetKey}
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 text-xs font-semibold text-[#0071e3]"
+                          onClick={() => void dispatchMaterial(preview, targetKey)}
+                        >
+                          <TargetIcon size={14} />
+                          {target.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-3 text-xs font-semibold text-[#1d1d1f]" onClick={() => void copyMaterialUrl(preview)}>
+                      <Copy size={14} />
+                      复制 URL
+                    </button>
+                    <button className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-3 text-xs font-semibold text-[#1d1d1f]" onClick={() => downloadMaterial(preview)}>
+                      <Download size={14} />
+                      下载
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-5 flex items-center gap-2 text-sm font-semibold">
