@@ -13,6 +13,7 @@ from app.models.generation import (
     ScriptGenerateReq,
     VideoCreateReq,
 )
+from app.services.event_service import event_service
 from app.services.script_skill_library import build_shoppable_video_script, list_script_templates
 
 
@@ -41,7 +42,14 @@ class GenerationService:
                 req.resolution,
                 cost,
             )
-        return dict(row)
+        data = dict(row)
+        await event_service.log_task_event(
+            "video",
+            data["id"],
+            "queued",
+            {"model_id": data["model_id"], "provider_key": data["provider_key"], "progress": data["progress"]},
+        )
+        return data
 
     async def run_video_job(self, user_id: UUID, job_id: UUID) -> dict:
         pool = await get_pool()
@@ -54,6 +62,7 @@ class GenerationService:
             if job is None:
                 raise AppError("E004", "视频任务不存在", 404)
             await conn.execute("UPDATE video.video_generation_jobs SET status='processing', progress=10 WHERE id=$1", job_id)
+        await event_service.log_task_event("video", job_id, "processing", {"progress": 10})
         params = VideoGenParams(
             prompt=job["prompt"],
             duration_seconds=job["duration_seconds"],
@@ -73,7 +82,14 @@ class GenerationService:
                 user_id,
                 result.url,
             )
-        return dict(row)
+        data = dict(row)
+        await event_service.log_task_event(
+            "video",
+            job_id,
+            "succeeded",
+            {"progress": data["progress"], "output_url": data["output_url"]},
+        )
+        return data
 
     async def list_video_jobs(self, user_id: UUID) -> list[dict]:
         pool = await get_pool()
@@ -121,7 +137,14 @@ class GenerationService:
                 req.image_format,
                 cost,
             )
-        return dict(row)
+        data = dict(row)
+        await event_service.log_task_event(
+            "image",
+            data["id"],
+            "queued",
+            {"model_id": data["model_id"], "provider_key": data["provider_key"], "progress": data["progress"]},
+        )
+        return data
 
     async def run_image_job(self, user_id: UUID, job_id: UUID, openai_api_key: str | None = None) -> dict:
         pool = await get_pool()
@@ -134,6 +157,7 @@ class GenerationService:
             if job is None:
                 raise AppError("E004", "图片任务不存在", 404)
             await conn.execute("UPDATE image.image_generation_jobs SET status='processing', progress=10 WHERE id=$1", job_id)
+        await event_service.log_task_event("image", job_id, "processing", {"progress": 10})
         params = ImageGenParams(
             prompt=job["prompt"],
             aspect_ratio=job["aspect_ratio"],
@@ -154,7 +178,14 @@ class GenerationService:
                 user_id,
                 result.url,
             )
-        return dict(row)
+        data = dict(row)
+        await event_service.log_task_event(
+            "image",
+            job_id,
+            "succeeded",
+            {"progress": data["progress"], "output_url": data["output_url"]},
+        )
+        return data
 
     async def list_image_jobs(self, user_id: UUID) -> list[dict]:
         pool = await get_pool()

@@ -72,6 +72,8 @@ async def test_enhance_tool_task_is_enqueued_to_worker(monkeypatch) -> None:
             return {
                 "id": "00000000-0000-0000-0000-000000000010",
                 "status": "queued",
+                "tool_key": "enhance",
+                "progress": 0,
                 "credit_cost": 30,
             }
 
@@ -94,8 +96,13 @@ async def test_enhance_tool_task_is_enqueued_to_worker(monkeypatch) -> None:
             calls.append((queue_name, func, args))
             return "rq_tool_job"
 
+    class FakeEventService:
+        async def log_task_event(self, task_type: str, task_id, event: str, payload=None) -> None:
+            calls.append(("event", f"{task_type}:{event}", (str(task_id), str(payload["progress"]))))
+
     monkeypatch.setattr(tool_service, "get_pool", fake_get_pool)
     monkeypatch.setattr(tool_service, "task_queue", FakeTaskQueue())
+    monkeypatch.setattr(tool_service, "event_service", FakeEventService())
 
     row = await ToolService().create_task(
         user_id="00000000-0000-0000-0000-000000000001",
@@ -104,7 +111,9 @@ async def test_enhance_tool_task_is_enqueued_to_worker(monkeypatch) -> None:
     )
 
     assert row["rq_job_id"] == "rq_tool_job"
+    assert ("event", "tool:queued", ("00000000-0000-0000-0000-000000000010", "0")) in calls
     assert calls == [
+        ("event", "tool:queued", ("00000000-0000-0000-0000-000000000010", "0")),
         (
             "tool:normal",
             "app.worker.tool_worker.process_tool_task",

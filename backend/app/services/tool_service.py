@@ -5,6 +5,7 @@ from uuid import UUID
 from app.core.database import get_pool
 from app.core.exceptions import AppError
 from app.core.task_queue import task_queue
+from app.services.event_service import event_service
 
 TOOLS = [
     {"tool_key": "enhance", "name": "画质增强", "status": "available", "credit_cost": 30},
@@ -61,6 +62,12 @@ class ToolService:
                 tool["credit_cost"],
             )
         data = dict(row)
+        await event_service.log_task_event(
+            "tool",
+            data["id"],
+            "queued",
+            {"tool_key": data["tool_key"], "progress": data["progress"]},
+        )
         rq_job_id = task_queue.enqueue(
             "tool:normal",
             "app.worker.tool_worker.process_tool_task",

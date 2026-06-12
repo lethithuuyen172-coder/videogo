@@ -32,6 +32,7 @@ def test_openapi_exposes_prd_api_surface() -> None:
 def test_migration_defines_required_schemas_and_tables() -> None:
     """001 迁移必须覆盖 PRD 指定的 6 个 schema 和 18 张表。"""
     migration = (ROOT / "backend/migrations/001_create_schema.sql").read_text(encoding="utf-8")
+    event_migration = (ROOT / "backend/migrations/004_unified_task_events.sql").read_text(encoding="utf-8")
     for schema in ["public", "video", "image", "canvas", "community", "chat"]:
         if schema == "public":
             assert "public.users" in migration
@@ -59,6 +60,14 @@ def test_migration_defines_required_schemas_and_tables() -> None:
         "chat.conversations",
         "chat.conversation_messages",
     } <= table_names
+    event_table_names = set(re.findall(r"CREATE TABLE IF NOT EXISTS ([a-z_]+\.[a-z_]+)", event_migration))
+    assert {"public.task_events", "public.material_usage_events"} <= event_table_names
+    for column in [
+        "created_at timestamptz NOT NULL DEFAULT now()",
+        "updated_at timestamptz NOT NULL DEFAULT now()",
+        "deleted_at timestamptz",
+    ]:
+        assert column in event_migration
 
 
 def test_seed_data_contains_required_providers() -> None:

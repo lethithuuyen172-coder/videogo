@@ -6,11 +6,18 @@ from uuid import UUID
 
 from app.config import get_settings
 from app.core.database import get_pool
+from app.services.event_service import event_service
 
 
 async def _process_tool_task(task_id: UUID) -> dict:
     output_url = _ensure_tool_output(task_id)
     pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE video.video_processing_jobs SET status='processing', progress=10 WHERE id=$1",
+            task_id,
+        )
+    await event_service.log_task_event("tool", task_id, "processing", {"progress": 10})
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
@@ -22,7 +29,16 @@ async def _process_tool_task(task_id: UUID) -> dict:
             task_id,
             output_url,
         )
-    return dict(row) if row else {"id": str(task_id), "status": "missing"}
+    if row:
+        data = dict(row)
+        await event_service.log_task_event(
+            "tool",
+            task_id,
+            "succeeded",
+            {"progress": data["progress"], "output_url": data["output_url"]},
+        )
+        return data
+    return {"id": str(task_id), "status": "missing"}
 
 
 def _ensure_tool_output(task_id: UUID) -> str:
