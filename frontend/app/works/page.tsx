@@ -55,6 +55,8 @@ export default function WorksPage() {
   const [isPublishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sourceFromTask, setSourceFromTask] = useState(false);
+  const [lastCreated, setLastCreated] = useState<Work | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -83,7 +85,10 @@ export default function WorksPage() {
     const descriptionParam = params.get("description");
     if (typeParam === "video" || typeParam === "image" || typeParam === "canvas") setWorkType(typeParam);
     if (titleParam) setTitle(titleParam.slice(0, 120));
-    if (coverParam) setCoverUrl(coverParam);
+    if (coverParam) {
+      setCoverUrl(coverParam);
+      setSourceFromTask(true);
+    }
     if (descriptionParam) setDescription(descriptionParam.slice(0, 500));
     void load();
   }, []);
@@ -116,9 +121,11 @@ export default function WorksPage() {
         cover_url: coverUrl.trim() || undefined,
       });
       setWorks((items) => [created, ...items]);
+      setLastCreated(created);
       setTitle("");
       setDescription("");
       setCoverUrl("");
+      setSourceFromTask(false);
       setNotice("作品已提交审核，通过后会出现在发现流。");
     } catch (err) {
       setError(err instanceof Error ? err.message : "作品发布失败");
@@ -158,6 +165,15 @@ export default function WorksPage() {
             <Send size={17} className="text-[#0071e3]" />
             <h2 className="text-sm font-semibold">发布到发现</h2>
           </div>
+          {sourceFromTask && coverUrl ? (
+            <div className="mt-4 overflow-hidden rounded-lg border border-[#0071e3]/20 bg-[#f2f8ff]">
+              <div className="px-3 py-2 text-xs font-semibold text-[#0071e3]">来自任务中心的生成结果</div>
+              <div className="max-h-40 bg-white">
+                {workType === "image" ? <img className="h-full max-h-40 w-full object-cover" src={coverUrl} alt="任务产物预览" /> : null}
+                {workType === "video" ? <video className="h-full max-h-40 w-full object-cover" src={coverUrl} /> : null}
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-4 grid grid-cols-3 gap-2">
             {workTypes.map((item) => {
@@ -219,6 +235,15 @@ export default function WorksPage() {
           </label>
 
           {notice ? <p className="mt-3 rounded-lg bg-[#e7f8ee] p-3 text-sm text-[#248a3d]">{notice}</p> : null}
+          {lastCreated ? (
+            <div className="mt-3 grid gap-2 rounded-lg border border-black/10 bg-[#f5f5f7] p-3 text-sm">
+              <div className="font-semibold text-[#1d1d1f]">已进入审核：{lastCreated.title}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <Link className="inline-flex h-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-[#0071e3]" href="/tasks">回任务中心</Link>
+                <Link className="inline-flex h-9 items-center justify-center rounded-full bg-[#1d1d1f] text-xs font-semibold text-white" href="/discover">查看发现</Link>
+              </div>
+            </div>
+          ) : null}
           {error ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
 
           <button className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#0071e3] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,113,227,0.28)] disabled:opacity-50" disabled={isPublishing || !title.trim()} onClick={submit}>
