@@ -76,6 +76,15 @@ export default function WorksPage() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const typeParam = params.get("type");
+    const titleParam = params.get("title");
+    const coverParam = params.get("cover");
+    const descriptionParam = params.get("description");
+    if (typeParam === "video" || typeParam === "image" || typeParam === "canvas") setWorkType(typeParam);
+    if (titleParam) setTitle(titleParam.slice(0, 120));
+    if (coverParam) setCoverUrl(coverParam);
+    if (descriptionParam) setDescription(descriptionParam.slice(0, 500));
     void load();
   }, []);
 

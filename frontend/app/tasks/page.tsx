@@ -214,6 +214,8 @@ function TaskRow({ task }: { task: TaskItem }) {
     : failedStatuses.includes(task.status)
       ? "bg-[#fff1f2] text-[#d70015]"
       : "bg-[#f2f8ff] text-[#0071e3]";
+  const publishType = task.kind === "image" ? "image" : "video";
+  const publishHref = `/works?type=${publishType}&title=${encodeURIComponent(task.kind === "tool" ? `工具结果 ${task.model_id}` : task.kind === "image" ? "AI 图片生成结果" : "AI 视频生成结果")}&cover=${encodeURIComponent(task.output_url ?? "")}&description=${encodeURIComponent(`${task.model_id} · ${task.status} · ${task.credit_cost} credits`)}`;
 
   return (
     <article className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_180px_160px] lg:items-center">
@@ -250,9 +252,14 @@ function TaskRow({ task }: { task: TaskItem }) {
           <div className="mt-1 font-semibold text-[#1d1d1f]">{task.credit_cost} 积分</div>
         </div>
         {task.output_url ? (
-          <a className="rounded-full bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white" href={task.output_url} target="_blank" rel="noreferrer">
-            查看
-          </a>
+          <div className="flex gap-2">
+            <a className="rounded-full bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white" href={task.output_url} target="_blank" rel="noreferrer">
+              查看
+            </a>
+            <Link className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" href={publishHref}>
+              发布
+            </Link>
+          </div>
         ) : (
           <Link className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" href={href}>
             继续
