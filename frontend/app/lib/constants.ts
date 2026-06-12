@@ -11,6 +11,7 @@ export const ROUTES = [
   { href: "/tools", label: "工具箱" },
   { href: "/assets", label: "资产" },
   { href: "/discover", label: "发现" },
+  { href: "/works", label: "我的作品" },
   { href: "/credits", label: "积分" },
   { href: "/admin", label: "管理后台" },
 ] as const;
