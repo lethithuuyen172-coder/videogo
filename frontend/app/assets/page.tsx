@@ -33,6 +33,9 @@ export default function AssetsPage() {
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [error, setError] = useState<string | null>(null);
+  const [tags, setTags] = useState("product,reference");
+  const [isUploading, setUploading] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
 
   const load = () => {
     const query = activeType ? `?material_type=${activeType}` : "";
@@ -73,6 +76,29 @@ export default function AssetsPage() {
     }
   };
 
+  const uploadFiles = async (files: FileList | File[]) => {
+    const items = [...files];
+    if (items.length === 0) return;
+    setError(null);
+    setUploadNotice(null);
+    setUploading(true);
+    try {
+      const uploaded: Material[] = [];
+      for (const file of items) {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("tags", tags);
+        uploaded.push(await apiClient.post<Material>("/materials", form));
+      }
+      setMaterials((current) => [...uploaded, ...current]);
+      setUploadNotice(`已上传 ${uploaded.length} 个素材`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "素材上传失败");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
       <section className="rounded-lg border border-black/10 bg-white/80 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl">
@@ -96,12 +122,42 @@ export default function AssetsPage() {
       <section className="mt-5 grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="grid h-fit gap-4">
           <Panel title="上传素材">
-            <div className="rounded-lg border border-dashed border-[#b9c3d0] bg-[#f5f5f7] p-5 text-center">
+            <div
+              className={`rounded-lg border border-dashed p-5 text-center transition ${isUploading ? "border-[#0071e3] bg-[#f2f8ff]" : "border-[#b9c3d0] bg-[#f5f5f7]"}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                void uploadFiles(event.dataTransfer.files);
+              }}
+            >
               <Upload className="mx-auto text-[#0071e3]" size={24} />
               <div className="mt-3 text-sm font-semibold">拖拽或选择文件</div>
               <p className="mt-2 text-xs leading-5 text-[#6e6e73]">支持图片、视频、音频和文本，后续会进入生成参考素材库。</p>
-              <button className="mt-4 rounded-full bg-[#0071e3] px-4 py-2 text-sm font-semibold text-white">选择文件</button>
+              <label className="mt-4 inline-flex cursor-pointer rounded-full bg-[#0071e3] px-4 py-2 text-sm font-semibold text-white">
+                {isUploading ? "上传中" : "选择文件"}
+                <input
+                  className="hidden"
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,audio/*,text/plain,.txt,.md,.json"
+                  disabled={isUploading}
+                  onChange={(event) => {
+                    if (event.target.files) void uploadFiles(event.target.files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
             </div>
+            <label className="mt-3 grid gap-1 text-xs font-semibold text-[#6e6e73]">
+              上传标签
+              <input
+                className="h-10 rounded-md border border-black/10 bg-[#f5f5f7] px-3 text-sm outline-none focus:border-[#0071e3] focus:bg-white"
+                value={tags}
+                onChange={(event) => setTags(event.target.value)}
+                placeholder="用英文逗号分隔"
+              />
+            </label>
+            {uploadNotice ? <p className="mt-3 rounded-lg bg-[#e7f8ee] p-3 text-sm text-[#248a3d]">{uploadNotice}</p> : null}
           </Panel>
           <Panel title="类型筛选">
             <div className="grid gap-2">
