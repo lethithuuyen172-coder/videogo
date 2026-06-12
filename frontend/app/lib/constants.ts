@@ -13,6 +13,7 @@ export const ROUTES = [
   { href: "/discover", label: "发现" },
   { href: "/works", label: "我的作品" },
   { href: "/credits", label: "积分" },
+  { href: "/account", label: "账号" },
   { href: "/admin", label: "管理后台" },
 ] as const;
 

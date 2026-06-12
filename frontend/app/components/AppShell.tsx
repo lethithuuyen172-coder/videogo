@@ -22,7 +22,7 @@ const navGroups = [
   },
   {
     title: "运营",
-    items: ROUTES.filter((item) => ["/assets", "/discover", "/works", "/credits", "/admin"].includes(item.href)),
+    items: ROUTES.filter((item) => ["/assets", "/discover", "/works", "/credits", "/account", "/admin"].includes(item.href)),
   },
 ];
 
