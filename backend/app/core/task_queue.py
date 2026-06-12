@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from rq import Queue
+from rq import Queue, Retry
 
 from app.core.redis_client import get_redis
 
@@ -19,7 +19,8 @@ class TaskQueue:
 
     def enqueue(self, queue_name: str, func: str, *args: Any, **kwargs: Any) -> str:
         """入队任务并返回 RQ job id。"""
-        job = self.queue(queue_name).enqueue(func, *args, **kwargs)
+        retry = kwargs.pop("retry", Retry(max=2, interval=[10, 30]))
+        job = self.queue(queue_name).enqueue(func, *args, retry=retry, **kwargs)
         return str(job.id)
 
     def get_queue_status(self, queue_name: str) -> dict[str, int]:

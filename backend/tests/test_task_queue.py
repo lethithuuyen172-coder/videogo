@@ -28,7 +28,10 @@ def test_task_queue_enqueue_accepts_import_path(monkeypatch) -> None:
     job_id = task_queue.enqueue("video:normal", "app.worker.video_worker.process_video_job", "u1", "j1")
 
     assert job_id == "rq_job_test"
-    assert queue.enqueued == ("app.worker.video_worker.process_video_job", ("u1", "j1"), {})
+    assert queue.enqueued[0:2] == ("app.worker.video_worker.process_video_job", ("u1", "j1"))
+    retry = queue.enqueued[2]["retry"]
+    assert retry.max == 2
+    assert retry.intervals == [10, 30]
 
 
 def test_openapi_exposes_enqueue_endpoints() -> None:

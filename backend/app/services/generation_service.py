@@ -15,6 +15,10 @@ from app.models.generation import (
 )
 from app.services.event_service import event_service
 from app.services.script_skill_library import build_shoppable_video_script, list_script_templates
+from app.services.worker_failure_service import (
+    should_finalize_worker_failure,
+    worker_failure_service,
+)
 
 
 class GenerationService:
@@ -69,7 +73,12 @@ class GenerationService:
             aspect_ratio=job["aspect_ratio"],
             resolution=job["resolution"],
         )
-        result = await provider_router.generate_video(job["model_id"], params)
+        try:
+            result = await provider_router.generate_video(job["model_id"], params)
+        except Exception as exc:
+            if should_finalize_worker_failure():
+                await worker_failure_service.finalize_failure("video", job_id, str(exc), user_id)
+            raise
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -165,7 +174,12 @@ class GenerationService:
             image_format=job["image_format"],
             openai_api_key=openai_api_key,
         )
-        result = await provider_router.generate_image(job["model_id"], params)
+        try:
+            result = await provider_router.generate_image(job["model_id"], params)
+        except Exception as exc:
+            if should_finalize_worker_failure():
+                await worker_failure_service.finalize_failure("image", job_id, str(exc), user_id)
+            raise
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
