@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileText, Grid2X2, Image as ImageIcon, List, Search, Trash2, Upload, Video, X } from "lucide-react";
+import { Download, FileText, GitBranch, Grid2X2, Image as ImageIcon, List, Save, Search, Trash2, Upload, Video, X } from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 type Material = {
@@ -9,7 +9,19 @@ type Material = {
   title: string;
   material_type: string;
   url?: string;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  tags?: string[];
   status: string;
+  created_at?: string;
+};
+
+type MaterialReference = {
+  id: string;
+  source_material_id?: string | null;
+  target_material_id?: string | null;
+  relation_type: string;
+  created_at: string;
 };
 
 const typeTabs = [
@@ -36,6 +48,11 @@ export default function AssetsPage() {
   const [tags, setTags] = useState("product,reference");
   const [isUploading, setUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const [references, setReferences] = useState<MaterialReference[]>([]);
+  const [editTitle, setEditTitle] = useState("");
+  const [editTags, setEditTags] = useState("");
+  const [isSaving, setSaving] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const load = () => {
     const query = activeType ? `?material_type=${activeType}` : "";
@@ -48,6 +65,18 @@ export default function AssetsPage() {
   useEffect(() => {
     load();
   }, [activeType]);
+
+  useEffect(() => {
+    if (!preview) return;
+    setEditTitle(preview.title);
+    setEditTags((preview.tags ?? []).join(","));
+    setReferences([]);
+    setDetailError(null);
+    apiClient
+      .get<MaterialReference[]>(`/materials/${preview.id}/references`)
+      .then(setReferences)
+      .catch((err) => setDetailError(err instanceof Error ? err.message : "引用链加载失败"));
+  }, [preview]);
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -96,6 +125,24 @@ export default function AssetsPage() {
       setError(err instanceof Error ? err.message : "素材上传失败");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const savePreview = async () => {
+    if (!preview) return;
+    setSaving(true);
+    setDetailError(null);
+    try {
+      const updated = await apiClient.put<Material>(`/materials/${preview.id}`, {
+        title: editTitle.trim() || preview.title,
+        tags: editTags.split(",").map((item) => item.trim()).filter(Boolean),
+      });
+      setPreview(updated);
+      setMaterials((items) => items.map((item) => item.id === updated.id ? updated : item));
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : "素材保存失败");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -233,15 +280,73 @@ export default function AssetsPage() {
             <button className="absolute right-3 top-3 rounded-full border border-black/10 bg-white p-2" onClick={() => setPreview(null)} aria-label="关闭">
               <X size={16} />
             </button>
-            <div className="mb-3 pr-10 text-sm font-semibold">{preview.title}</div>
-            {preview.material_type === "image" && preview.url ? <img className="max-h-[78vh] w-full object-contain" src={preview.url} alt={preview.title} /> : null}
-            {preview.material_type === "video" && preview.url ? <video className="max-h-[78vh] w-full" src={preview.url} controls /> : null}
-            {!["image", "video"].includes(preview.material_type) ? <div className="rounded-lg bg-[#f5f5f7] p-6 text-sm">{preview.url ?? preview.material_type}</div> : null}
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div>
+                <div className="mb-3 pr-10 text-sm font-semibold">{preview.title}</div>
+                {preview.material_type === "image" && preview.url ? <img className="max-h-[78vh] w-full object-contain" src={preview.url} alt={preview.title} /> : null}
+                {preview.material_type === "video" && preview.url ? <video className="max-h-[78vh] w-full" src={preview.url} controls /> : null}
+                {!["image", "video"].includes(preview.material_type) ? <div className="rounded-lg bg-[#f5f5f7] p-6 text-sm">{preview.url ?? preview.material_type}</div> : null}
+              </div>
+              <aside className="max-h-[78vh] overflow-auto rounded-lg border border-black/10 bg-[#f5f5f7] p-4">
+                <h3 className="text-sm font-semibold">素材详情</h3>
+                <label className="mt-4 grid gap-1 text-xs font-semibold text-[#6e6e73]">
+                  标题
+                  <input className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#0071e3]" value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
+                </label>
+                <label className="mt-3 grid gap-1 text-xs font-semibold text-[#6e6e73]">
+                  标签
+                  <input className="h-10 rounded-md border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#0071e3]" value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="product,ugc,reference" />
+                </label>
+                <button className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#0071e3] text-sm font-semibold text-white disabled:opacity-50" disabled={isSaving} onClick={savePreview}>
+                  <Save size={15} />
+                  {isSaving ? "保存中" : "保存素材"}
+                </button>
+                {detailError ? <p className="mt-3 rounded-md bg-red-50 p-2 text-xs text-red-600">{detailError}</p> : null}
+
+                <div className="mt-5 grid gap-2 text-xs text-[#6e6e73]">
+                  <Info label="类型" value={preview.material_type} />
+                  <Info label="状态" value={preview.status} />
+                  <Info label="MIME" value={preview.mime_type ?? "--"} />
+                  <Info label="大小" value={formatBytes(preview.size_bytes)} />
+                </div>
+
+                <div className="mt-5 flex items-center gap-2 text-sm font-semibold">
+                  <GitBranch size={16} className="text-[#0071e3]" />
+                  引用链
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {references.length === 0 ? <div className="rounded-md border border-dashed border-black/10 bg-white p-3 text-xs text-[#86868b]">暂无引用记录</div> : null}
+                  {references.map((ref) => (
+                    <div key={ref.id} className="rounded-md border border-black/10 bg-white p-3 text-xs">
+                      <div className="font-semibold text-[#1d1d1f]">{ref.relation_type}</div>
+                      <div className="mt-1 break-all text-[#86868b]">source: {ref.source_material_id ?? "--"}</div>
+                      <div className="mt-1 break-all text-[#86868b]">target: {ref.target_material_id ?? "--"}</div>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            </div>
           </div>
         </div>
       ) : null}
     </div>
   );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-md bg-white px-3 py-2">
+      <span>{label}</span>
+      <span className="font-semibold text-[#1d1d1f]">{value}</span>
+    </div>
+  );
+}
+
+function formatBytes(value?: number | null) {
+  if (!value) return "--";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 102.4) / 10} KB`;
+  return `${Math.round(value / 1024 / 102.4) / 10} MB`;
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
