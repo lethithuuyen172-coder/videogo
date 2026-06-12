@@ -26,7 +26,10 @@ type EnhancePresets = {
 type ToolTask = {
   id: string;
   status: string;
+  progress?: number;
   credit_cost: number;
+  output_url?: string | null;
+  error_message?: string | null;
   rq_job_id?: string | null;
 };
 
@@ -81,6 +84,7 @@ export default function EnhancePage() {
       };
       const created = await apiClient.post<ToolTask>("/tools/enhance/tasks", payload);
       setTask(created);
+      setTask(await pollToolTask(created.id, created));
     } catch (err) {
       setError(err instanceof Error ? err.message : "画质增强任务创建失败");
     } finally {
@@ -121,8 +125,10 @@ export default function EnhancePage() {
               </div>
               <div>ID：{task.id}</div>
               <div>状态：{task.status}</div>
+              <div>进度：{task.progress ?? 0}%</div>
               <div>积分：{task.credit_cost}</div>
               {task.rq_job_id ? <div>队列：{task.rq_job_id}</div> : null}
+              {task.output_url ? <a className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#12381f]" href={task.output_url} target="_blank" rel="noreferrer">打开结果</a> : null}
             </div>
           ) : (
             <div className="mt-4 rounded-lg bg-white/10 p-4 text-sm leading-6 text-white/70">
@@ -243,9 +249,15 @@ export default function EnhancePage() {
                   {task ? <BadgeCheck size={24} /> : <Video size={24} />}
                 </div>
                 <div className="mt-4 text-sm font-semibold">{task ? `任务 ${task.status}` : "等待上传素材"}</div>
+                {task ? (
+                  <div className="mx-auto mt-4 h-2 w-full max-w-sm overflow-hidden rounded-full bg-[#e8e8ed]">
+                    <div className="h-full rounded-full bg-[#0071e3]" style={{ width: `${Math.min(100, Math.max(0, task.progress ?? 0))}%` }} />
+                  </div>
+                ) : null}
                 <p className="mt-2 max-w-sm text-xs leading-5 text-[#86868b]">
-                  {task ? "Worker 完成后可通过工具任务详情接口查看 output_url。" : "创建任务后会展示队列状态、消耗积分和后端任务 ID。"}
+                  {task?.output_url ? "处理已完成，可以打开结果文件。" : task ? "正在通过工具任务详情接口同步 output_url、进度和消耗积分。" : "创建任务后会展示队列状态、消耗积分和后端任务 ID。"}
                 </p>
+                {task?.error_message ? <p className="mt-3 text-xs text-red-600">{task.error_message}</p> : null}
               </div>
             </div>
           </Panel>
@@ -270,6 +282,16 @@ export default function EnhancePage() {
       `}</style>
     </div>
   );
+}
+
+async function pollToolTask(taskId: string, initial: ToolTask): Promise<ToolTask> {
+  let latest = initial;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    latest = { ...latest, ...(await apiClient.get<ToolTask>(`/tools/tasks/${taskId}`)) };
+    if (["succeeded", "failed", "cancelled"].includes(latest.status)) return latest;
+  }
+  return { ...latest, ...(await apiClient.get<ToolTask>(`/tools/tasks/${taskId}`)) };
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
