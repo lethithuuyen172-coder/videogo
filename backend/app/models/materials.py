@@ -24,6 +24,18 @@ class MaterialDispatchReq(BaseModel):
     target_route: str | None = Field(default=None, max_length=160)
 
 
+class MaterialCreateFromUrlReq(BaseModel):
+    """从任务输出 URL 幂等沉淀为素材。"""
+
+    url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=120)
+    material_type: Literal["image", "video", "audio", "text"]
+    mime_type: str | None = Field(default=None, max_length=120)
+    tags: list[str] = Field(default_factory=list)
+    source_task_type: str | None = Field(default=None, max_length=40)
+    source_task_id: UUID | None = None
+
+
 class MaterialResp(BaseModel):
     """素材响应对象。"""
 

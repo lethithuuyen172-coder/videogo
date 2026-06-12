@@ -243,6 +243,29 @@ def test_assets_page_dispatches_materials_to_creation_workspaces() -> None:
         assert snippet in assets
 
 
+def test_tasks_page_reuses_outputs_and_saves_assets() -> None:
+    """任务中心成功输出必须支持保存资产和复用到创作工作台。"""
+    tasks = (ROOT / "frontend/app/tasks/page.tsx").read_text(encoding="utf-8")
+    materials_router = (ROOT / "backend/app/routers/materials.py").read_text(encoding="utf-8")
+    for snippet in [
+        'apiClient.post("/materials/from-url"',
+        "saveToAssets",
+        "copyOutputUrl",
+        "downloadOutput",
+        'buildReuseUrl("/canvas")',
+        'buildReuseUrl("/tools/video-quality-enhance")',
+        "存资产",
+        "复制",
+        "下载",
+        "画布",
+        "复用",
+        "增强",
+        "source_task_id: task.id",
+    ]:
+        assert snippet in tasks
+    assert '@router.post("/from-url")' in materials_router
+
+
 def test_frontend_global_shell_and_error_pages_cover_mobile_acceptance() -> None:
     """全局壳必须覆盖侧边栏登录态、移动底部导航、404 和错误页。"""
     shell = (ROOT / "frontend/app/components/AppShell.tsx").read_text(encoding="utf-8")

@@ -7,7 +7,12 @@ import pytest
 from pydantic import ValidationError
 
 from app.main import app
-from app.models.materials import MaterialDispatchReq, MaterialResp, MaterialUpdateReq
+from app.models.materials import (
+    MaterialCreateFromUrlReq,
+    MaterialDispatchReq,
+    MaterialResp,
+    MaterialUpdateReq,
+)
 from app.services import material_service as material_module
 from app.services.material_service import MaterialService
 
@@ -19,6 +24,7 @@ def test_material_routes_match_prd_contract() -> None:
     assert "/api/v1/materials/{material_id}/references" in paths
     assert "/api/v1/materials/batch-delete" in paths
     assert "/api/v1/materials/upload-url" in paths
+    assert "/api/v1/materials/from-url" in paths
     assert "patch" in paths["/api/v1/materials/{material_id}"]
 
 
@@ -76,6 +82,21 @@ def test_material_dispatch_route_and_model_contract() -> None:
     assert req.target_type == "image"
 
 
+def test_material_from_url_model_contract() -> None:
+    """任务输出 URL 可作为素材引用保存，不复制文件二进制。"""
+    task_id = uuid4()
+    req = MaterialCreateFromUrlReq(
+        url="http://localhost:8000/storage/generated/out.png",
+        title="AI 图片输出",
+        material_type="image",
+        source_task_type="image",
+        source_task_id=task_id,
+        tags=["task-output"],
+    )
+    assert req.source_task_id == task_id
+    assert req.material_type == "image"
+
+
 @pytest.mark.asyncio
 async def test_material_dispatch_logs_usage_event(monkeypatch) -> None:
     """素材派发必须写入 material_usage_events 的服务层入口。"""
@@ -117,3 +138,55 @@ async def test_material_dispatch_logs_usage_event(monkeypatch) -> None:
     assert result["dispatched"] is True
     assert calls[0][0:4] == (user_id, material_id, "use_as_input", "image")
     assert calls[0][5]["target_route"] == "/image"
+
+
+@pytest.mark.asyncio
+async def test_create_from_url_returns_existing_material(monkeypatch) -> None:
+    """同一用户同一输出 URL 重复保存时必须幂等返回已有素材。"""
+    user_id = uuid4()
+    material_id = uuid4()
+
+    class FakeConnection:
+        async def fetchrow(self, query: str, *args):
+            if "SELECT * FROM public.materials" in query:
+                return {
+                    "id": material_id,
+                    "user_id": user_id,
+                    "material_type": "image",
+                    "source": "task_output",
+                    "title": "existing",
+                    "url": args[1],
+                    "mime_type": "image/png",
+                    "size_bytes": 0,
+                    "tags": ["task-output"],
+                    "is_subject": False,
+                    "status": "active",
+                    "created_at": datetime.now(UTC),
+                }
+            raise AssertionError("existing material should avoid insert")
+
+    class FakeAcquire:
+        async def __aenter__(self):
+            return FakeConnection()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    class FakePool:
+        def acquire(self):
+            return FakeAcquire()
+
+    async def fake_get_pool() -> FakePool:
+        return FakePool()
+
+    monkeypatch.setattr(material_module, "get_pool", fake_get_pool)
+    result = await MaterialService().create_from_url(
+        user_id,
+        MaterialCreateFromUrlReq(
+            url="http://localhost:8000/storage/generated/out.png",
+            title="new",
+            material_type="image",
+        ),
+    )
+
+    assert result["id"] == material_id

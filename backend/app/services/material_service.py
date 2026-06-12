@@ -8,7 +8,7 @@ from fastapi import UploadFile
 from app.core.database import get_pool
 from app.core.exceptions import AppError
 from app.core.storage import get_storage
-from app.models.materials import MaterialDispatchReq, MaterialUpdateReq
+from app.models.materials import MaterialCreateFromUrlReq, MaterialDispatchReq, MaterialUpdateReq
 from app.services.event_service import event_service
 
 
@@ -42,6 +42,51 @@ class MaterialService:
                 tags or [],
             )
         return dict(row)
+
+    async def create_from_url(self, user_id: UUID, req: MaterialCreateFromUrlReq) -> dict:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            existing = await conn.fetchrow(
+                """
+                SELECT * FROM public.materials
+                WHERE user_id=$1 AND url=$2 AND deleted_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                user_id,
+                req.url,
+            )
+            if existing:
+                return dict(existing)
+            row = await conn.fetchrow(
+                """
+                INSERT INTO public.materials
+                  (user_id, material_type, source, title, url, mime_type, tags, metadata)
+                VALUES ($1, $2, 'task_output', $3, $4, $5, $6, $7)
+                RETURNING *
+                """,
+                user_id,
+                req.material_type,
+                req.title,
+                req.url,
+                req.mime_type,
+                req.tags,
+                {
+                    "source_task_type": req.source_task_type,
+                    "source_task_id": str(req.source_task_id) if req.source_task_id else None,
+                },
+            )
+        data = dict(row)
+        if req.source_task_id:
+            await event_service.log_material_usage_event(
+                user_id,
+                data["id"],
+                "save_task_output",
+                req.source_task_type,
+                req.source_task_id,
+                {"url": req.url, "material_type": req.material_type},
+            )
+        return data
 
     async def list_materials(
         self,

@@ -2,7 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2, Clock3, FileVideo, Image as ImageIcon, Loader2, Plus, RefreshCw, Sparkles, WandSparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  Brush,
+  CheckCircle2,
+  Clock3,
+  Copy,
+  Download,
+  FileVideo,
+  Image as ImageIcon,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Save,
+  Sparkles,
+  WandSparkles,
+} from "lucide-react";
 import { apiClient } from "@/lib/api";
 
 type Job = {
@@ -47,6 +63,7 @@ const doneStatuses = ["succeeded", "completed", "done"];
 const failedStatuses = ["failed", "cancelled", "canceled"];
 
 export default function TasksPage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [filter, setFilter] = useState<(typeof filters)[number]["value"]>("all");
   const [isLoading, setLoading] = useState(true);
@@ -179,7 +196,7 @@ export default function TasksPage() {
         ) : (
           <div className="divide-y divide-black/10">
             {visibleTasks.map((task) => (
-              <TaskRow key={`${task.kind}-${task.id}`} task={task} />
+              <TaskRow key={`${task.kind}-${task.id}`} task={task} onTaskSaved={loadTasks} routerPush={router.push} />
             ))}
           </div>
         )}
@@ -206,9 +223,19 @@ function Metric({ icon: Icon, label, value, tone }: { icon: typeof Loader2; labe
   );
 }
 
-function TaskRow({ task }: { task: TaskItem }) {
+function TaskRow({
+  task,
+  onTaskSaved,
+  routerPush,
+}: {
+  task: TaskItem;
+  onTaskSaved: () => void;
+  routerPush: (href: string) => void;
+}) {
   const Icon = task.kind === "video" ? FileVideo : task.kind === "image" ? ImageIcon : WandSparkles;
   const href = task.kind === "video" ? "/video" : task.kind === "image" ? "/image" : "/tools";
+  const [notice, setNotice] = useState("");
+  const [isSaving, setSaving] = useState(false);
   const statusTone = doneStatuses.includes(task.status)
     ? "bg-[#e7f8ee] text-[#248a3d]"
     : failedStatuses.includes(task.status)
@@ -216,6 +243,55 @@ function TaskRow({ task }: { task: TaskItem }) {
       : "bg-[#f2f8ff] text-[#0071e3]";
   const publishType = task.kind === "image" ? "image" : "video";
   const publishHref = `/works?type=${publishType}&title=${encodeURIComponent(task.kind === "tool" ? `工具结果 ${task.model_id}` : task.kind === "image" ? "AI 图片生成结果" : "AI 视频生成结果")}&cover=${encodeURIComponent(task.output_url ?? "")}&description=${encodeURIComponent(`${task.model_id} · ${task.status} · ${task.credit_cost} credits`)}`;
+  const outputType = task.kind === "image" ? "image" : "video";
+  const outputTitle = task.kind === "tool" ? `工具结果 ${task.model_id}` : task.kind === "image" ? "AI 图片生成结果" : "AI 视频生成结果";
+
+  const buildReuseUrl = (targetHref: string) => {
+    const params = new URLSearchParams();
+    params.set("reference", task.output_url ?? "");
+    params.set("subject", outputTitle);
+    params.set("prompt", `${outputTitle} 复用：${task.model_id}`);
+    return `${targetHref}?${params.toString()}`;
+  };
+
+  const copyOutputUrl = async () => {
+    if (!task.output_url) return;
+    await navigator.clipboard.writeText(task.output_url);
+    setNotice("已复制输出 URL");
+  };
+
+  const downloadOutput = () => {
+    if (!task.output_url) return;
+    const anchor = document.createElement("a");
+    anchor.href = task.output_url;
+    anchor.download = outputTitle;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setNotice("已开始下载");
+  };
+
+  const saveToAssets = async () => {
+    if (!task.output_url) return;
+    setSaving(true);
+    setNotice("");
+    try {
+      await apiClient.post("/materials/from-url", {
+        url: task.output_url,
+        title: outputTitle,
+        material_type: outputType,
+        tags: ["task-output", task.kind, task.model_id],
+        source_task_type: task.kind,
+        source_task_id: task.id,
+      });
+      setNotice("已保存到资产中心");
+      onTaskSaved();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "保存到资产失败");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <article className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_180px_160px] lg:items-center">
@@ -252,10 +328,34 @@ function TaskRow({ task }: { task: TaskItem }) {
           <div className="mt-1 font-semibold text-[#1d1d1f]">{task.credit_cost} 积分</div>
         </div>
         {task.output_url ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <a className="rounded-full bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white" href={task.output_url} target="_blank" rel="noreferrer">
               查看
             </a>
+            <button className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" onClick={() => void saveToAssets()} disabled={isSaving}>
+              <Save size={13} className="inline" />
+              {isSaving ? "保存中" : "存资产"}
+            </button>
+            <button className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" onClick={() => void copyOutputUrl()}>
+              <Copy size={13} className="inline" />
+              复制
+            </button>
+            <button className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" onClick={downloadOutput}>
+              <Download size={13} className="inline" />
+              下载
+            </button>
+            <button className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" onClick={() => routerPush(buildReuseUrl("/canvas"))}>
+              <Brush size={13} className="inline" />
+              画布
+            </button>
+            <button className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" onClick={() => routerPush(buildReuseUrl(task.kind === "image" ? "/image" : "/video"))}>
+              {task.kind === "image" ? <ImageIcon size={13} className="inline" /> : <FileVideo size={13} className="inline" />}
+              复用
+            </button>
+            <button className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" onClick={() => routerPush(buildReuseUrl("/tools/video-quality-enhance"))}>
+              <WandSparkles size={13} className="inline" />
+              增强
+            </button>
             <Link className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#0071e3]" href={publishHref}>
               发布
             </Link>
@@ -265,6 +365,7 @@ function TaskRow({ task }: { task: TaskItem }) {
             继续
           </Link>
         )}
+        {notice ? <div className="mt-2 text-right text-xs font-semibold text-[#0071e3]">{notice}</div> : null}
       </div>
     </article>
   );

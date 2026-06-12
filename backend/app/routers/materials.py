@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from app.core.responses import ok
 from app.models.materials import (
+    MaterialCreateFromUrlReq,
     MaterialDispatchReq,
     MaterialReferenceResp,
     MaterialResp,
@@ -46,6 +47,18 @@ async def list_materials(
     """查询当前用户素材列表。"""
     items = await service.list_materials(current_user["id"], material_type, is_subject)
     return ok([MaterialResp(**item).model_dump(mode="json") for item in items], request)
+
+
+@router.post("/from-url")
+async def create_material_from_url(
+    req: MaterialCreateFromUrlReq,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    service: MaterialService = Depends(get_material_service),
+) -> dict:
+    """把任务输出 URL 幂等保存为素材记录，不复制二进制文件。"""
+    material = await service.create_from_url(current_user["id"], req)
+    return ok(MaterialResp(**material).model_dump(mode="json"), request)
 
 
 @router.get("/{material_id}")
