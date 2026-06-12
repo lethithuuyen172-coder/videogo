@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock3, FileVideo, ImagePlus, Layers3, Play, WandSparkles } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { readCreationContext } from "@/lib/creationContext";
 import { VideoPreview } from "./components/VideoPreview";
 import { VideoSettingsPanel } from "./components/VideoSettingsPanel";
 import { useVideoGeneration } from "./hooks/useVideoGeneration";
@@ -55,12 +56,11 @@ export default function VideoPage() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const promptParam = searchParams.get("prompt");
-    const referenceParam = searchParams.get("reference");
-    const subjectParam = searchParams.get("subject");
-    if (promptParam) setPrompt(promptParam.slice(0, 4000));
-    if (referenceParam) setReferenceAsset(referenceParam);
-    if (subjectParam) setProductName(subjectParam);
+    const context = readCreationContext(searchParams);
+    if (context.prompt) setPrompt(context.prompt.slice(0, 4000));
+    if (context.reference) setReferenceAsset(context.reference);
+    else if (context.subject_material_id) setReferenceAsset(context.subject_material_id);
+    if (context.subject) setProductName(context.subject);
   }, []);
 
   useEffect(() => {

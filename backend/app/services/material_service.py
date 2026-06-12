@@ -42,7 +42,12 @@ class MaterialService:
             )
         return dict(row)
 
-    async def list_materials(self, user_id: UUID, material_type: str | None = None) -> list[dict]:
+    async def list_materials(
+        self,
+        user_id: UUID,
+        material_type: str | None = None,
+        is_subject: bool | None = None,
+    ) -> list[dict]:
         pool = await get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
@@ -50,11 +55,13 @@ class MaterialService:
                 SELECT * FROM public.materials
                 WHERE user_id=$1 AND deleted_at IS NULL
                   AND ($2::text IS NULL OR material_type=$2)
+                  AND ($3::boolean IS NULL OR is_subject=$3)
                 ORDER BY created_at DESC
                 LIMIT 100
                 """,
                 user_id,
                 material_type,
+                is_subject,
             )
         return [dict(row) for row in rows]
 
@@ -76,7 +83,7 @@ class MaterialService:
             row = await conn.fetchrow(
                 """
                 UPDATE public.materials
-                SET title=COALESCE($3, title), tags=COALESCE($4, tags)
+                SET title=COALESCE($3, title), tags=COALESCE($4, tags), is_subject=COALESCE($5, is_subject)
                 WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
                 RETURNING *
                 """,
@@ -84,6 +91,7 @@ class MaterialService:
                 user_id,
                 req.title,
                 req.tags,
+                req.is_subject,
             )
         if row is None:
             raise AppError("E004", "素材不存在", 404)

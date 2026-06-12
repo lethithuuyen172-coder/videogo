@@ -33,6 +33,7 @@ def test_migration_defines_required_schemas_and_tables() -> None:
     """001 迁移必须覆盖 PRD 指定的 6 个 schema 和 18 张表。"""
     migration = (ROOT / "backend/migrations/001_create_schema.sql").read_text(encoding="utf-8")
     event_migration = (ROOT / "backend/migrations/004_unified_task_events.sql").read_text(encoding="utf-8")
+    subject_migration = (ROOT / "backend/migrations/005_material_subject_flag.sql").read_text(encoding="utf-8")
     for schema in ["public", "video", "image", "canvas", "community", "chat"]:
         if schema == "public":
             assert "public.users" in migration
@@ -68,6 +69,7 @@ def test_migration_defines_required_schemas_and_tables() -> None:
         "deleted_at timestamptz",
     ]:
         assert column in event_migration
+    assert "ADD COLUMN IF NOT EXISTS is_subject boolean NOT NULL DEFAULT false" in subject_migration
 
 
 def test_seed_data_contains_required_providers() -> None:
@@ -197,6 +199,10 @@ def test_homepage_dispatches_modes_and_da_style_skills() -> None:
         'href: "/tools/video-subtitle-erase"',
         'href: "/tools/hot-video-remix"',
         "sessionStorage.setItem",
+        "apiClient",
+        '"/materials?is_subject=true"',
+        "subject_material_id",
+        "setSubjectMaterialId(item.id)",
         "normalizedPrompt.slice(0, 2000)",
         "先输入一个创作需求",
         "router.push(`${activeMode.href}?${query}`)",
@@ -207,13 +213,13 @@ def test_homepage_dispatches_modes_and_da_style_skills() -> None:
         '"video-watermark-remove": "watermark-remove"',
         '"video-subtitle-erase": "subtitle-erase"',
         '"hot-video-remix": "viral-remix"',
-        "context_id",
-        "sessionStorage.getItem",
-        "searchParams.get(\"prompt\")",
-        "searchParams.get(\"reference\")",
-        "searchParams.get(\"subject\")",
+        "readCreationContext(searchParams)",
     ]:
         assert snippet in tool_detail
+    context_helper = (ROOT / "frontend/app/lib/creationContext.ts").read_text(encoding="utf-8")
+    assert "context_id" in context_helper
+    assert "sessionStorage.getItem(`videogo:create:${contextId}`)" in context_helper
+    assert 'subject_material_id: searchParams.get("subject_material_id") ?? ""' in context_helper
 
 
 def test_frontend_global_shell_and_error_pages_cover_mobile_acceptance() -> None:

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { OpenAIKeyBox } from "@/components/OpenAIKeyBox";
 import { apiClient } from "@/lib/api";
+import { readCreationContext } from "@/lib/creationContext";
 
 type Message = { role: "user" | "assistant"; content: string };
 type Conversation = { id: string; title: string; skill_key: string; created_at: string };
@@ -60,12 +61,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const prompt = searchParams.get("prompt");
-    const referenceParam = searchParams.get("reference");
-    const subjectParam = searchParams.get("subject");
-    if (prompt) setInput(prompt);
-    if (referenceParam) setReference(referenceParam);
-    if (subjectParam) setSubject(subjectParam);
+    const context = readCreationContext(searchParams);
+    if (context.prompt) setInput(context.prompt);
+    if (context.reference) setReference(context.reference);
+    else if (context.subject_material_id) setReference(context.subject_material_id);
+    if (context.subject) setSubject(context.subject);
   }, []);
 
   useEffect(() => {

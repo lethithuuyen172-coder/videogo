@@ -12,6 +12,7 @@ class MaterialUpdateReq(BaseModel):
 
     title: str | None = Field(default=None, max_length=120)
     tags: list[str] | None = None
+    is_subject: bool | None = None
 
 
 class MaterialResp(BaseModel):
@@ -25,6 +26,7 @@ class MaterialResp(BaseModel):
     mime_type: str | None
     size_bytes: int | None
     tags: list[str]
+    is_subject: bool = False
     status: str
     created_at: datetime
 

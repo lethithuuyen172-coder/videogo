@@ -15,6 +15,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { readCreationContext } from "@/lib/creationContext";
 
 const toolConfig = {
   enhance: {
@@ -114,28 +115,11 @@ export default function ToolDetailPage() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const contextId = searchParams.get("context_id");
-    if (contextId) {
-      const raw = sessionStorage.getItem(`videogo:create:${contextId}`);
-      if (raw) {
-        try {
-          const data = JSON.parse(raw) as { prompt?: string; reference?: string; subject?: string };
-          if (data.reference) setAsset(data.reference);
-          if (data.prompt || data.subject) {
-            setPrompt([data.subject ? `主体：${data.subject}` : null, data.prompt].filter(Boolean).join("\n"));
-          }
-          return;
-        } catch {
-          sessionStorage.removeItem(`videogo:create:${contextId}`);
-        }
-      }
-    }
-    const promptParam = searchParams.get("prompt");
-    const referenceParam = searchParams.get("reference");
-    const subjectParam = searchParams.get("subject");
-    if (referenceParam) setAsset(referenceParam);
-    if (promptParam || subjectParam) {
-      setPrompt([subjectParam ? `主体：${subjectParam}` : null, promptParam].filter(Boolean).join("\n").slice(0, 2000));
+    const context = readCreationContext(searchParams);
+    if (context.reference) setAsset(context.reference);
+    else if (context.subject_material_id) setAsset(context.subject_material_id);
+    if (context.prompt || context.subject) {
+      setPrompt([context.subject ? `主体：${context.subject}` : null, context.prompt].filter(Boolean).join("\n").slice(0, 2000));
     }
   }, []);
 

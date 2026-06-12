@@ -34,11 +34,12 @@ async def upload_material(
 async def list_materials(
     request: Request,
     material_type: str | None = None,
+    is_subject: bool | None = None,
     current_user: dict = Depends(get_current_user),
     service: MaterialService = Depends(get_material_service),
 ) -> dict:
     """查询当前用户素材列表。"""
-    items = await service.list_materials(current_user["id"], material_type)
+    items = await service.list_materials(current_user["id"], material_type, is_subject)
     return ok([MaterialResp(**item).model_dump(mode="json") for item in items], request)
 
 
@@ -55,6 +56,7 @@ async def get_material(
 
 
 @router.put("/{material_id}")
+@router.patch("/{material_id}")
 async def update_material(
     material_id: UUID,
     req: MaterialUpdateReq,

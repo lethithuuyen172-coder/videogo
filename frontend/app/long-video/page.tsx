@@ -15,6 +15,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { readCreationContext } from "@/lib/creationContext";
 
 type ProviderModel = {
   model_id: string;
@@ -137,12 +138,11 @@ export default function LongVideoPage() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const promptParam = searchParams.get("prompt");
-    const referenceParam = searchParams.get("reference");
-    const subjectParam = searchParams.get("subject");
-    if (subjectParam) setProductName(subjectParam);
-    if (referenceParam) setReferenceAsset(referenceParam);
-    if (promptParam) setBrandTone((current) => `${current}；首页需求：${promptParam.slice(0, 240)}`);
+    const context = readCreationContext(searchParams);
+    if (context.subject) setProductName(context.subject);
+    if (context.reference) setReferenceAsset(context.reference);
+    else if (context.subject_material_id) setReferenceAsset(context.subject_material_id);
+    if (context.prompt) setBrandTone((current) => `${current}；首页需求：${context.prompt.slice(0, 240)}`);
   }, []);
 
   const promptJson = useMemo(() => {

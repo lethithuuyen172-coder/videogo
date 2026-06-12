@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   AtSign,
@@ -18,6 +18,15 @@ import {
   Video,
   WandSparkles,
 } from "lucide-react";
+import { apiClient } from "@/lib/api";
+
+type SubjectMaterial = {
+  id: string;
+  title: string;
+  material_type: string;
+  url?: string | null;
+  is_subject?: boolean;
+};
 
 const modes = [
   { key: "agent", label: "Agent", href: "/chat", icon: MessageSquareText },
@@ -86,10 +95,20 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState("帮我把一款 TikTok 带货商品做成高转化视频素材");
   const [reference, setReference] = useState("");
   const [subject, setSubject] = useState("");
+  const [subjectMaterialId, setSubjectMaterialId] = useState("");
+  const [subjectMaterials, setSubjectMaterials] = useState<SubjectMaterial[]>([]);
+  const [isSubjectPickerOpen, setSubjectPickerOpen] = useState(false);
   const [isSkillOpen, setSkillOpen] = useState(false);
   const [notice, setNotice] = useState("");
 
   const activeMode = useMemo(() => modes.find((item) => item.key === mode) ?? modes[0], [mode]);
+
+  useEffect(() => {
+    apiClient
+      .get<SubjectMaterial[]>("/materials?is_subject=true")
+      .then(setSubjectMaterials)
+      .catch(() => setSubjectMaterials([]));
+  }, []);
 
   const buildContextQuery = () => {
     const normalizedPrompt = prompt.trim();
@@ -107,16 +126,23 @@ export default function HomePage() {
       const handoffId = `home-${Date.now()}`;
       sessionStorage.setItem(
         `videogo:create:${handoffId}`,
-        JSON.stringify({ prompt: nextPrompt, reference: normalizedReference, subject: normalizedSubject }),
+        JSON.stringify({
+          prompt: nextPrompt,
+          reference: normalizedReference,
+          subject: normalizedSubject,
+          subject_material_id: subjectMaterialId,
+        }),
       );
       params.set("context_id", handoffId);
     } else {
       params.set("prompt", nextPrompt);
       if (normalizedReference) params.set("reference", normalizedReference);
       if (normalizedSubject) params.set("subject", normalizedSubject);
+      if (subjectMaterialId) params.set("subject_material_id", subjectMaterialId);
     }
     if (!params.has("reference") && normalizedReference) params.set("reference", normalizedReference);
     if (!params.has("subject") && normalizedSubject) params.set("subject", normalizedSubject);
+    if (!params.has("subject_material_id") && subjectMaterialId) params.set("subject_material_id", subjectMaterialId);
     return params.toString();
   };
 
@@ -137,6 +163,7 @@ export default function HomePage() {
     if (prompt.trim()) params.set("prompt", prompt.trim().slice(0, 2000));
     if (reference.trim()) params.set("reference", reference.trim());
     if (subject.trim()) params.set("subject", subject.trim());
+    if (subjectMaterialId) params.set("subject_material_id", subjectMaterialId);
     const query = params.toString();
     return query ? `?${query}` : "";
   };
@@ -157,7 +184,54 @@ export default function HomePage() {
         <div className="mx-auto mt-7 max-w-4xl rounded-[28px] border border-black/10 bg-[#f5f5f7] p-3 shadow-inner">
           <div className="grid gap-2 md:grid-cols-2">
             <LabeledInput icon={FileUp} label="参考素材" value={reference} onChange={setReference} placeholder="粘贴商品图、视频、素材 ID 或竞品链接" />
-            <LabeledInput icon={AtSign} label="@主体" value={subject} onChange={setSubject} placeholder="商品、角色、品牌或目标人群" />
+            <label className="relative grid gap-1 rounded-[18px] bg-white px-4 py-3 text-xs text-[#86868b]">
+              <span className="flex items-center gap-1 font-semibold text-[#1d1d1f]">
+                <AtSign size={14} className="text-[#0071e3]" />
+                @主体
+              </span>
+              <input
+                className="bg-transparent text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b]"
+                value={subject}
+                placeholder="输入 @ 选择主体素材，或手动填写商品/角色"
+                onFocus={() => setSubjectPickerOpen(subject.includes("@"))}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setSubject(next);
+                  setSubjectMaterialId("");
+                  setSubjectPickerOpen(next.includes("@"));
+                }}
+              />
+              {isSubjectPickerOpen ? (
+                <div className="absolute left-0 right-0 top-[76px] z-20 max-h-64 overflow-auto rounded-lg border border-black/10 bg-white p-2 text-left shadow-[0_18px_50px_rgba(0,0,0,0.14)]">
+                  {subjectMaterials.length ? (
+                    subjectMaterials.map((item) => (
+                      <button
+                        key={item.id}
+                        className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-[#f5f5f7]"
+                        onClick={() => {
+                          setSubject(item.title);
+                          setSubjectMaterialId(item.id);
+                          if (item.url) setReference(item.url);
+                          setSubjectPickerOpen(false);
+                        }}
+                      >
+                        <span className="grid h-9 w-9 place-items-center rounded-md bg-[#e8f2ff] text-[11px] font-semibold text-[#0071e3]">
+                          {item.material_type}
+                        </span>
+                        <span>
+                          <span className="block text-sm font-semibold text-[#1d1d1f]">{item.title}</span>
+                          <span className="block text-xs text-[#86868b]">{item.id}</span>
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-lg bg-[#f5f5f7] p-3 text-xs leading-5 text-[#6e6e73]">
+                      暂无主体素材；可在资产中心把素材标记为主体，或继续手动填写。
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </label>
           </div>
           <textarea
             className="mt-3 min-h-32 w-full resize-none rounded-[22px] border border-black/10 bg-white px-5 py-4 text-base outline-none transition placeholder:text-[#86868b] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"

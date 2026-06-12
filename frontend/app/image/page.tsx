@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Clock3, ImagePlus, Layers3, Sparkles } from "lucide-react";
 import { OpenAIKeyBox } from "@/components/OpenAIKeyBox";
 import { apiClient } from "@/lib/api";
+import { readCreationContext } from "@/lib/creationContext";
 import { ImagePreview } from "./components/ImagePreview";
 import { ImageSettingsPanel } from "./components/ImageSettingsPanel";
 import { useImageGeneration } from "./hooks/useImageGeneration";
@@ -33,13 +34,12 @@ export default function ImagePage() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const promptParam = searchParams.get("prompt");
-    const referenceParam = searchParams.get("reference");
-    const subjectParam = searchParams.get("subject");
-    if (promptParam || subjectParam) {
-      setPrompt([subjectParam ? `主体：${subjectParam}` : null, promptParam].filter(Boolean).join("\n").slice(0, 2000));
+    const context = readCreationContext(searchParams);
+    if (context.prompt || context.subject) {
+      setPrompt([context.subject ? `主体：${context.subject}` : null, context.prompt].filter(Boolean).join("\n").slice(0, 2000));
     }
-    if (referenceParam) setReferenceAsset(referenceParam);
+    if (context.reference) setReferenceAsset(context.reference);
+    else if (context.subject_material_id) setReferenceAsset(context.subject_material_id);
   }, []);
 
   useEffect(() => {

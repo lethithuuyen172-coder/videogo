@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.main import app
-from app.models.materials import MaterialResp
+from app.models.materials import MaterialResp, MaterialUpdateReq
 from app.services.material_service import MaterialService
 
 
@@ -18,6 +18,7 @@ def test_material_routes_match_prd_contract() -> None:
     assert "/api/v1/materials/{material_id}/references" in paths
     assert "/api/v1/materials/batch-delete" in paths
     assert "/api/v1/materials/upload-url" in paths
+    assert "patch" in paths["/api/v1/materials/{material_id}"]
 
 
 def test_material_type_is_mapped_from_supported_mime() -> None:
@@ -43,3 +44,23 @@ def test_material_response_rejects_unknown_type() -> None:
             status="active",
             created_at=datetime.now(UTC),
         )
+
+
+def test_material_update_and_response_support_subject_flag() -> None:
+    """素材可标记为主体，供首页 @ 选择器和生成器上下文复用。"""
+    req = MaterialUpdateReq(is_subject=True)
+    assert req.is_subject is True
+    material = MaterialResp(
+        id=uuid4(),
+        material_type="image",
+        source="upload",
+        title="subject",
+        url="http://example.com/a.png",
+        mime_type="image/png",
+        size_bytes=1,
+        tags=[],
+        is_subject=True,
+        status="active",
+        created_at=datetime.now(UTC),
+    )
+    assert material.is_subject is True

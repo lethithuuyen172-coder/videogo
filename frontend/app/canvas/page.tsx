@@ -18,6 +18,7 @@ import {
   Square,
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { readCreationContext } from "@/lib/creationContext";
 
 type CanvasItem = {
   id: string;
@@ -107,14 +108,13 @@ export default function CanvasHomePage() {
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
-    const promptParam = searchParams.get("prompt");
-    const referenceParam = searchParams.get("reference");
-    const subjectParam = searchParams.get("subject");
-    if (promptParam) setContextPrompt(promptParam);
-    if (referenceParam) setContextReference(referenceParam);
-    if (subjectParam) {
-      setContextSubject(subjectParam);
-      setCustomTitle(`${subjectParam} 画布`);
+    const context = readCreationContext(searchParams);
+    if (context.prompt) setContextPrompt(context.prompt);
+    if (context.reference) setContextReference(context.reference);
+    else if (context.subject_material_id) setContextReference(context.subject_material_id);
+    if (context.subject) {
+      setContextSubject(context.subject);
+      setCustomTitle(`${context.subject} 画布`);
     }
     apiClient.get<CanvasItem[]>("/canvases").then(setItems).catch((err) => setError(err instanceof Error ? err.message : "画布加载失败"));
   }, []);
