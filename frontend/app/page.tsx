@@ -27,12 +27,10 @@ const modes = [
 ];
 
 const skillChips = [
-  { label: "画质增强", href: "/tools/enhance" },
-  { label: "去水印", href: "/tools/watermark-remove" },
-  { label: "去字幕", href: "/tools/subtitle-erase" },
-  { label: "爆款裂变", href: "/tools/viral-remix" },
-  { label: "反推提示词", href: "/tools/prompt-reverse" },
-  { label: "视频提示词", href: "/tools/video-prompt" },
+  { label: "画质增强", href: "/tools/video-quality-enhance", desc: "提升视频清晰度、分辨率和观感。" },
+  { label: "去水印", href: "/tools/video-watermark-remove", desc: "清理自有或授权素材中的固定水印。" },
+  { label: "去字幕", href: "/tools/video-subtitle-erase", desc: "擦除硬字幕、贴片和旧促销文字。" },
+  { label: "爆款裂变", href: "/tools/hot-video-remix", desc: "把一条素材扩展成多套带货变体。" },
 ];
 
 const creationFlows = [
@@ -88,16 +86,59 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState("帮我把一款 TikTok 带货商品做成高转化视频素材");
   const [reference, setReference] = useState("");
   const [subject, setSubject] = useState("");
+  const [isSkillOpen, setSkillOpen] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const activeMode = useMemo(() => modes.find((item) => item.key === mode) ?? modes[0], [mode]);
 
-  const launch = () => {
+  const buildContextQuery = () => {
+    const normalizedPrompt = prompt.trim();
+    const normalizedReference = reference.trim();
+    const normalizedSubject = subject.trim();
+    if (!normalizedPrompt) {
+      setNotice("先输入一个创作需求");
+      return null;
+    }
     const params = new URLSearchParams();
-    if (prompt.trim()) params.set("prompt", prompt.trim());
+    const nextPrompt = normalizedPrompt.slice(0, 2000);
+    if (normalizedPrompt.length > 2000) setNotice("已截断到 2000 字后带入工作台");
+    else setNotice("");
+    if (nextPrompt.length > 1200 && typeof window !== "undefined") {
+      const handoffId = `home-${Date.now()}`;
+      sessionStorage.setItem(
+        `videogo:create:${handoffId}`,
+        JSON.stringify({ prompt: nextPrompt, reference: normalizedReference, subject: normalizedSubject }),
+      );
+      params.set("context_id", handoffId);
+    } else {
+      params.set("prompt", nextPrompt);
+      if (normalizedReference) params.set("reference", normalizedReference);
+      if (normalizedSubject) params.set("subject", normalizedSubject);
+    }
+    if (!params.has("reference") && normalizedReference) params.set("reference", normalizedReference);
+    if (!params.has("subject") && normalizedSubject) params.set("subject", normalizedSubject);
+    return params.toString();
+  };
+
+  const launch = () => {
+    const query = buildContextQuery();
+    if (query === null) return;
+    router.push(`${activeMode.href}?${query}`);
+  };
+
+  const launchSkill = (href: string) => {
+    const query = buildContextQuery();
+    if (query === null) return;
+    router.push(`${href}?${query}`);
+  };
+
+  const previewQuery = () => {
+    const params = new URLSearchParams();
+    if (prompt.trim()) params.set("prompt", prompt.trim().slice(0, 2000));
     if (reference.trim()) params.set("reference", reference.trim());
     if (subject.trim()) params.set("subject", subject.trim());
     const query = params.toString();
-    router.push(`${activeMode.href}${query ? `?${query}` : ""}`);
+    return query ? `?${query}` : "";
   };
 
   return (
@@ -147,21 +188,57 @@ export default function HomePage() {
                 </button>
               );
             })}
+            <button
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-black/10 bg-white px-5 text-sm font-semibold text-[#1d1d1f]"
+              onClick={() => setSkillOpen(true)}
+            >
+              选择技能
+              <Scissors size={16} />
+            </button>
             <button className="ml-auto inline-flex h-11 items-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(0,113,227,0.28)]" onClick={launch}>
               开始
               <Send size={16} />
             </button>
           </div>
+          {notice ? <div className="mt-3 rounded-lg bg-white px-3 py-2 text-left text-xs font-semibold text-[#bf5700]">{notice}</div> : null}
         </div>
 
         <div className="mx-auto mt-4 flex max-w-4xl flex-wrap justify-center gap-2">
           {skillChips.map((item) => (
-            <Link key={item.href} className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]" href={item.href}>
+            <Link key={item.href} className="rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]" href={`${item.href}${previewQuery()}`}>
               {item.label}
             </Link>
           ))}
         </div>
       </section>
+
+      {isSkillOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="选择技能">
+          <div className="w-full max-w-2xl rounded-lg border border-black/10 bg-white p-4 shadow-[0_24px_80px_rgba(0,0,0,0.2)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">选择技能</h2>
+                <p className="mt-1 text-sm text-[#6e6e73]">把当前输入直接带到指定工具工作台。</p>
+              </div>
+              <button className="rounded-full bg-[#f5f5f7] px-3 py-2 text-sm font-semibold text-[#6e6e73]" onClick={() => setSkillOpen(false)}>
+                关闭
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {skillChips.map((item) => (
+                <button
+                  key={item.href}
+                  className="rounded-lg border border-black/10 bg-[#f5f5f7] p-4 text-left transition hover:border-[#0071e3] hover:bg-white"
+                  onClick={() => launchSkill(item.href)}
+                >
+                  <div className="text-sm font-semibold text-[#1d1d1f]">{item.label}</div>
+                  <p className="mt-2 text-xs leading-5 text-[#6e6e73]">{item.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -183,6 +183,39 @@ def test_frontend_required_pages_exist_and_are_api_driven() -> None:
         assert "Array.from" not in text
 
 
+def test_homepage_dispatches_modes_and_da_style_skills() -> None:
+    """首页中央输入框必须分发到 Agent/视频/图片和 DA-style 四技能入口。"""
+    home = (ROOT / "frontend/app/page.tsx").read_text(encoding="utf-8")
+    tool_detail = (ROOT / "frontend/app/tools/[toolKey]/page.tsx").read_text(encoding="utf-8")
+    for snippet in [
+        'key: "agent", label: "Agent", href: "/chat"',
+        'key: "video", label: "AI 视频", href: "/video"',
+        'key: "image", label: "AI 图片", href: "/image"',
+        "选择技能",
+        'href: "/tools/video-quality-enhance"',
+        'href: "/tools/video-watermark-remove"',
+        'href: "/tools/video-subtitle-erase"',
+        'href: "/tools/hot-video-remix"',
+        "sessionStorage.setItem",
+        "normalizedPrompt.slice(0, 2000)",
+        "先输入一个创作需求",
+        "router.push(`${activeMode.href}?${query}`)",
+    ]:
+        assert snippet in home
+    for snippet in [
+        '"video-quality-enhance": "enhance"',
+        '"video-watermark-remove": "watermark-remove"',
+        '"video-subtitle-erase": "subtitle-erase"',
+        '"hot-video-remix": "viral-remix"',
+        "context_id",
+        "sessionStorage.getItem",
+        "searchParams.get(\"prompt\")",
+        "searchParams.get(\"reference\")",
+        "searchParams.get(\"subject\")",
+    ]:
+        assert snippet in tool_detail
+
+
 def test_frontend_global_shell_and_error_pages_cover_mobile_acceptance() -> None:
     """全局壳必须覆盖侧边栏登录态、移动底部导航、404 和错误页。"""
     shell = (ROOT / "frontend/app/components/AppShell.tsx").read_text(encoding="utf-8")

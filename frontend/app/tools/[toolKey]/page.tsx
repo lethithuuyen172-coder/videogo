@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -17,6 +17,16 @@ import {
 import { apiClient } from "@/lib/api";
 
 const toolConfig = {
+  enhance: {
+    title: "画质增强",
+    group: "视频处理",
+    icon: Wand2,
+    desc: "提升视频清晰度、分辨率、帧率和降噪效果，适合二次剪辑前处理。",
+    primaryLabel: "创建画质增强任务",
+    promptLabel: "增强目标",
+    placeholder: "例如：提升到 4K，轻度降噪，保留商品边缘细节",
+    presets: ["清晰度增强", "4K 放大", "轻度降噪", "帧率优化"],
+  },
   "subtitle-erase": {
     title: "字幕擦除",
     group: "视频处理",
@@ -71,6 +81,13 @@ const toolConfig = {
 
 type ToolKey = keyof typeof toolConfig;
 
+const toolAliases: Record<string, ToolKey> = {
+  "video-quality-enhance": "enhance",
+  "video-watermark-remove": "watermark-remove",
+  "video-subtitle-erase": "subtitle-erase",
+  "hot-video-remix": "viral-remix",
+};
+
 const fallbackKey: ToolKey = "video-prompt";
 
 type ToolTask = {
@@ -84,7 +101,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 
 export default function ToolDetailPage() {
   const params = useParams<{ toolKey: string }>();
-  const key = (params.toolKey in toolConfig ? params.toolKey : fallbackKey) as ToolKey;
+  const key = (params.toolKey in toolConfig ? params.toolKey : toolAliases[params.toolKey] ?? fallbackKey) as ToolKey;
   const config = toolConfig[key];
   const Icon = config.icon;
   const [asset, setAsset] = useState("");
@@ -94,6 +111,33 @@ export default function ToolDetailPage() {
   const [status, setStatus] = useState<"idle" | "running" | "done">("idle");
   const [task, setTask] = useState<ToolTask | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const contextId = searchParams.get("context_id");
+    if (contextId) {
+      const raw = sessionStorage.getItem(`videogo:create:${contextId}`);
+      if (raw) {
+        try {
+          const data = JSON.parse(raw) as { prompt?: string; reference?: string; subject?: string };
+          if (data.reference) setAsset(data.reference);
+          if (data.prompt || data.subject) {
+            setPrompt([data.subject ? `主体：${data.subject}` : null, data.prompt].filter(Boolean).join("\n"));
+          }
+          return;
+        } catch {
+          sessionStorage.removeItem(`videogo:create:${contextId}`);
+        }
+      }
+    }
+    const promptParam = searchParams.get("prompt");
+    const referenceParam = searchParams.get("reference");
+    const subjectParam = searchParams.get("subject");
+    if (referenceParam) setAsset(referenceParam);
+    if (promptParam || subjectParam) {
+      setPrompt([subjectParam ? `主体：${subjectParam}` : null, promptParam].filter(Boolean).join("\n").slice(0, 2000));
+    }
+  }, []);
 
   const preview = useMemo(() => {
     return [
