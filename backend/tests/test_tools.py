@@ -13,6 +13,7 @@ def test_tool_routes_cover_enhance_and_coming_soon_tools() -> None:
     """工具箱必须暴露列表、画质增强和其余工具任务骨架。"""
     paths = app.openapi()["paths"]
     assert "/api/v1/tools" in paths
+    assert "/api/v1/tools/tasks" in paths
     assert "/api/v1/tools/enhance/presets" in paths
     assert "/api/v1/tools/{tool_key}/tasks" in paths
     assert "/api/v1/tools/subtitle-erase/tasks" in paths

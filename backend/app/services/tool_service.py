@@ -25,6 +25,20 @@ class ToolService:
     def enhance_presets(self) -> dict:
         return {"resolutions": ["2K", "4K"], "fps": [30, 60], "denoise": ["low", "medium", "high"]}
 
+    async def list_tasks(self, user_id: UUID) -> list[dict]:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM video.video_processing_jobs
+                WHERE user_id=$1 AND deleted_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT 100
+                """,
+                user_id,
+            )
+        return [dict(row) for row in rows]
+
     async def create_task(self, user_id: UUID, tool_key: str, payload: dict) -> dict:
         tool = next((item for item in TOOLS if item["tool_key"] == tool_key), None)
         if tool is None:

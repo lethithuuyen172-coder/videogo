@@ -46,6 +46,33 @@ async def create_tool_task(
     )
 
 
+@router.get("/tasks")
+async def list_tool_tasks(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    service: ToolService = Depends(get_tool_service),
+) -> dict:
+    """查询当前用户工具任务列表。"""
+    rows = await service.list_tasks(current_user["id"])
+    return ok(
+        [
+            {
+                "id": str(row["id"]),
+                "tool_key": row["tool_key"],
+                "status": row["status"],
+                "progress": row["progress"],
+                "credit_cost": row["credit_cost"],
+                "output_url": row["output_url"],
+                "error_code": row["error_code"],
+                "error_message": row["error_message"],
+                "created_at": row["created_at"].isoformat(),
+            }
+            for row in rows
+        ],
+        request,
+    )
+
+
 @router.get("/tasks/{task_id}")
 async def get_tool_task(
     task_id: UUID,
