@@ -88,7 +88,12 @@ export default function RegisterPage() {
                 <p className="mt-1 text-xs">开发环境会直接返回邮箱验证 token，便于本地验收。</p>
               </div>
             ) : null}
-            {message ? <Link className="rounded-full border border-black/10 bg-white px-3 py-2 text-center text-sm font-semibold text-[#0071e3]" href="/auth/login">去登录</Link> : null}
+            {message ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Link className="rounded-full border border-black/10 bg-white px-3 py-2 text-center text-sm font-semibold text-[#0071e3]" href="/auth/login">去登录</Link>
+                <Link className="rounded-full bg-[#1d1d1f] px-3 py-2 text-center text-sm font-semibold text-white" href={`/auth/verify-email${verifyToken ? `?token=${encodeURIComponent(verifyToken)}` : ""}`}>验证邮箱</Link>
+              </div>
+            ) : null}
             <Link className="text-sm font-semibold text-[#0071e3]" href="/auth/login">已有账号？去登录</Link>
             {verifyToken ? (
               <textarea className="h-24 rounded-lg border border-black/10 bg-[#f5f5f7] p-2 text-xs outline-none" readOnly value={verifyToken} />
