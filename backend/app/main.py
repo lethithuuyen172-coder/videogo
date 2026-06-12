@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.core.database import close_pool, create_pool
 from app.core.exceptions import AppError
+from app.core.rate_limit import is_rate_limited
 from app.core.responses import fail
 from app.core.telemetry import REQUEST_COUNTER, REQUEST_LATENCY, create_metrics_app
 from app.routers import (
@@ -65,6 +66,17 @@ def create_app() -> FastAPI:
     ) -> Response:
         """为每个请求注入 request_id 并记录基础访问日志。"""
         request.state.request_id = f"req_{uuid4().hex}"
+        limited, rule = is_rate_limited(request, settings)
+        if limited:
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content=fail(
+                    "E429",
+                    "请求过于频繁，请稍后再试",
+                    request,
+                    {"rule": rule.name if rule else "unknown"},
+                ),
+            )
         started = perf_counter()
         response = await call_next(request)
         duration = perf_counter() - started

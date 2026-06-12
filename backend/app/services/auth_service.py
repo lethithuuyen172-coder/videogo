@@ -114,7 +114,7 @@ class AuthService:
                 req.email.lower(),
             )
         if row is None:
-            return {"status": "accepted", "expires_in_hours": 24, "reset_token": None}
+            return {"status": "accepted", "expires_in_hours": 24, "reset_token": None}  # nosec B105
         token = create_jwt(str(row["id"]), "password_reset")
         return {"status": "accepted", "expires_in_hours": 24, "reset_token": token}
 

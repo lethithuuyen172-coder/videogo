@@ -1,6 +1,7 @@
 "use client";
 
 import { API_BASE_URL } from "./constants";
+import { getSessionOpenAIKey } from "./sessionOpenAIKey";
 
 type ApiOptions = RequestInit & { auth?: boolean };
 type ApiEnvelope<T> = {
@@ -27,7 +28,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  const openaiApiKey = typeof window !== "undefined" ? localStorage.getItem("openai_api_key") : null;
+  const openaiApiKey = typeof window !== "undefined" ? getSessionOpenAIKey() : null;
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (openaiApiKey) headers.set("X-OpenAI-API-Key", openaiApiKey);
   if (!(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -56,7 +57,7 @@ async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
 async function streamRequest(path: string, body?: unknown): Promise<ReadableStream<Uint8Array>> {
   const headers = new Headers();
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  const openaiApiKey = typeof window !== "undefined" ? localStorage.getItem("openai_api_key") : null;
+  const openaiApiKey = typeof window !== "undefined" ? getSessionOpenAIKey() : null;
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (openaiApiKey) headers.set("X-OpenAI-API-Key", openaiApiKey);
   headers.set("Content-Type", "application/json");

@@ -201,7 +201,7 @@ class GenerationService:
     async def _get_job(self, table: str, user_id: UUID, job_id: UUID, message: str) -> dict:
         pool = await get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(f"SELECT * FROM {table} WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL", job_id, user_id)
+            row = await conn.fetchrow(f"SELECT * FROM {table} WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL", job_id, user_id)  # nosec B608
         if row is None:
             raise AppError("E004", message, 404)
         return dict(row)

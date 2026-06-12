@@ -136,7 +136,7 @@ def test_frontend_api_calls_go_through_api_client() -> None:
     assert "async function readJson" in api_text
     assert "if (!res.ok)" in api_text
     assert 'new ApiError("STREAM_ERROR"' in api_text
-    assert 'localStorage.getItem("openai_api_key")' in api_text
+    assert "getSessionOpenAIKey()" in api_text
     assert 'headers.set("X-OpenAI-API-Key", openaiApiKey)' in api_text
 
 
@@ -346,15 +346,16 @@ def test_frontend_openai_key_can_be_filled_in_browser() -> None:
     image = (ROOT / "frontend/app/image/page.tsx").read_text(encoding="utf-8")
     image_settings = (ROOT / "frontend/app/image/components/ImageSettingsPanel.tsx").read_text(encoding="utf-8")
     for snippet in [
-        'localStorage.getItem("openai_api_key")',
-        'localStorage.setItem("openai_api_key", trimmed)',
-        'localStorage.removeItem("openai_api_key")',
-        'window.dispatchEvent(new Event("openai-api-key-updated"))',
+        "setSessionOpenAIKey(trimmed)",
+        "clearSessionOpenAIKey()",
         "OpenAI API Key",
         'placeholder="sk-..."',
-        "已保存到本机浏览器",
+        "已在当前会话生效",
     ]:
         assert snippet in key_box
+    session_key = (ROOT / "frontend/app/lib/sessionOpenAIKey.ts").read_text(encoding="utf-8")
+    assert 'window.dispatchEvent(new Event("openai-api-key-updated"))' in session_key
+    assert "localStorage" not in session_key
     assert "OpenAIKeyBox" in chat
     assert "OpenAIKeyBox" in image
     assert 'const effectiveRunMode = modelId === "dalle-3" ? "sync" : runMode' in image

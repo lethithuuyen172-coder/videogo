@@ -2,8 +2,9 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Cookie, Depends, Header, Request, Response
 
+from app.config import get_settings
 from app.core.exceptions import AppError
 from app.core.responses import ok
 from app.core.security import verify_jwt
@@ -31,11 +32,15 @@ def get_auth_service() -> AuthService:
 async def get_current_user(
     authorization: str | None = Header(default=None),
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    cookie_token: str | None = Cookie(default=None, alias="videogo_access_token"),
     service: AuthService = Depends(get_auth_service),
 ) -> dict:
     """解析 Bearer Token 或 X-API-Key 并加载当前用户。"""
     if authorization and authorization.startswith("Bearer "):
         payload = verify_jwt(authorization.removeprefix("Bearer ").strip())
+        return await service.get_user(str(payload["sub"]))
+    if cookie_token:
+        payload = verify_jwt(cookie_token.strip())
         return await service.get_user(str(payload["sub"]))
     if x_api_key:
         return await service.get_user_by_api_key(x_api_key.strip())
@@ -66,9 +71,24 @@ async def register(req: UserRegisterReq, request: Request, service: AuthService 
 
 
 @router.post("/login")
-async def login(req: UserLoginReq, request: Request, service: AuthService = Depends(get_auth_service)) -> dict:
+async def login(
+    req: UserLoginReq,
+    request: Request,
+    response: Response,
+    service: AuthService = Depends(get_auth_service),
+) -> dict:
     """邮箱密码登录，密码错误5次锁定15分钟。"""
     tokens = await service.login(req)
+    settings = get_settings()
+    response.set_cookie(
+        settings.auth_cookie_name,
+        tokens.access_token,
+        max_age=settings.access_token_minutes * 60,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
+        path="/",
+    )
     return ok(tokens.model_dump(), request)
 
 
@@ -82,13 +102,17 @@ async def refresh(req: RefreshTokenReq, request: Request, service: AuthService =
 @router.post("/logout")
 async def logout(
     request: Request,
+    response: Response,
     authorization: str | None = Header(default=None),
+    cookie_token: str | None = Cookie(default=None, alias="videogo_access_token"),
     service: AuthService = Depends(get_auth_service),
 ) -> dict:
     """登出当前 access token。"""
-    if not authorization or not authorization.startswith("Bearer "):
+    token = authorization.removeprefix("Bearer ").strip() if authorization and authorization.startswith("Bearer ") else cookie_token
+    if not token:
         raise AppError("E002", "未认证或Token无效", 401)
-    service.logout(authorization.removeprefix("Bearer ").strip())
+    service.logout(token.strip())
+    response.delete_cookie(get_settings().auth_cookie_name, path="/")
     return ok({"revoked": True}, request)
 
 

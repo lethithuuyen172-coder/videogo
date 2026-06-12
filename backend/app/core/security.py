@@ -25,13 +25,13 @@ def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
 
-def create_jwt(subject: str, token_type: str = "access", extra: dict[str, Any] | None = None) -> str:
+def create_jwt(subject: str, token_type: str = "access", extra: dict[str, Any] | None = None) -> str:  # nosec B107
     """签发 access/refresh token，并写入 jti 以支持撤销。"""
     settings = get_settings()
     now = datetime.now(UTC)
     ttl = (
         timedelta(minutes=settings.access_token_minutes)
-        if token_type == "access"
+        if token_type == "access"  # nosec B105
         else timedelta(days=settings.refresh_token_days)
     )
     payload = {

@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     credit_unit_cny: float = 0.01
     request_timeout_seconds: float = 30.0
     skip_db_startup: bool = False
+    rate_limit_enabled: bool = False
+    rate_limit_login_per_minute: int = 10
+    rate_limit_generation_per_minute: int = 30
+    auth_cookie_name: str = "videogo_access_token"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     @field_validator("jwt_secret_key")
     @classmethod

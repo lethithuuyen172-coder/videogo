@@ -1,24 +1,20 @@
 "use client";
 
 import { KeyRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { clearSessionOpenAIKey, setSessionOpenAIKey } from "@/lib/sessionOpenAIKey";
 
 export function OpenAIKeyBox() {
   const [value, setValue] = useState("");
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    setValue(localStorage.getItem("openai_api_key") ?? "");
-  }, []);
-
   const save = () => {
     const trimmed = value.trim();
     if (trimmed) {
-      localStorage.setItem("openai_api_key", trimmed);
+      setSessionOpenAIKey(trimmed);
     } else {
-      localStorage.removeItem("openai_api_key");
+      clearSessionOpenAIKey();
     }
-    window.dispatchEvent(new Event("openai-api-key-updated"));
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
   };
@@ -39,7 +35,7 @@ export function OpenAIKeyBox() {
       <button className="mt-2 rounded-md bg-accent px-3 py-2 text-white" onClick={save}>
         保存
       </button>
-      {saved ? <span className="ml-2 text-xs text-signal">已保存到本机浏览器</span> : null}
+      {saved ? <span className="ml-2 text-xs text-signal">已在当前会话生效</span> : null}
     </div>
   );
 }
