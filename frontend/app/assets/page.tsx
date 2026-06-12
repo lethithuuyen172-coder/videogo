@@ -53,6 +53,8 @@ export default function AssetsPage() {
   const [editTags, setEditTags] = useState("");
   const [isSaving, setSaving] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchDeleting, setBatchDeleting] = useState(false);
 
   const load = () => {
     const query = activeType ? `?material_type=${activeType}` : "";
@@ -93,15 +95,65 @@ export default function AssetsPage() {
     };
   }, [materials]);
 
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected = filtered.length > 0 && filtered.every((item) => selectedIds.has(item.id));
+
   const remove = async (material: Material) => {
     if (!confirm(`确认删除 ${material.title}？`)) return;
     setError(null);
     try {
       await apiClient.delete(`/materials/${material.id}`);
       setMaterials((items) => items.filter((item) => item.id !== material.id));
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(material.id);
+        return next;
+      });
       if (preview?.id === material.id) setPreview(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "素材删除失败");
+    }
+  };
+
+  const toggleSelected = (materialId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(materialId)) {
+        next.delete(materialId);
+      } else {
+        next.add(materialId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        filtered.forEach((item) => next.delete(item.id));
+      } else {
+        filtered.forEach((item) => next.add(item.id));
+      }
+      return next;
+    });
+  };
+
+  const batchDelete = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (!confirm(`确认批量删除 ${ids.length} 个素材？`)) return;
+    setError(null);
+    setBatchDeleting(true);
+    try {
+      await apiClient.post<{ deleted: string[] }>("/materials/batch-delete", { ids });
+      setMaterials((items) => items.filter((item) => !selectedIds.has(item.id)));
+      if (preview && selectedIds.has(preview.id)) setPreview(null);
+      setSelectedIds(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "素材批量删除失败");
+    } finally {
+      setBatchDeleting(false);
     }
   };
 
@@ -239,6 +291,19 @@ export default function AssetsPage() {
               <List size={16} />
             </button>
           </div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-black/10 bg-[#f5f5f7] px-3 py-2">
+            <label className="inline-flex items-center gap-2 text-sm font-semibold text-[#424245]">
+              <input className="h-4 w-4 accent-[#0071e3]" type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
+              选择当前结果
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-[#86868b]">已选 {selectedCount}</span>
+              <button className="inline-flex h-9 items-center gap-2 rounded-full border border-black/10 bg-white px-3 text-xs font-semibold text-red-600 disabled:opacity-40" disabled={selectedCount === 0 || isBatchDeleting} onClick={batchDelete}>
+                <Trash2 size={14} />
+                {isBatchDeleting ? "删除中" : "批量删除"}
+              </button>
+            </div>
+          </div>
           {error ? <div className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
           {filtered.length === 0 && !error ? (
             <div className="rounded-lg border border-dashed border-black/10 bg-[#f5f5f7] p-10 text-center text-sm text-[#6e6e73]">
@@ -250,6 +315,13 @@ export default function AssetsPage() {
               const Icon = typeIcon[item.material_type] ?? FileText;
               return (
                 <article key={item.id} className={`rounded-lg border border-black/10 bg-white p-3 text-sm ${viewMode === "list" ? "grid grid-cols-[80px_1fr_auto] items-center gap-3" : ""}`}>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#86868b]">
+                      <input className="h-4 w-4 accent-[#0071e3]" type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelected(item.id)} />
+                      选择
+                    </label>
+                    {item.tags?.length ? <span className="truncate text-xs text-[#86868b]">{item.tags.slice(0, 2).join(",")}</span> : null}
+                  </div>
                   <button className={`${viewMode === "grid" ? "aspect-square" : "h-16"} w-full overflow-hidden rounded-lg bg-[#f5f5f7] text-left`} onClick={() => setPreview(item)}>
                     {item.material_type === "image" && item.url ? <img className="h-full w-full object-cover" src={item.url} alt={item.title} /> : null}
                     {item.material_type === "video" && item.url ? <video className="h-full w-full object-cover" src={item.url} /> : null}
